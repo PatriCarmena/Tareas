@@ -19,7 +19,7 @@ if (Uri.TryCreate(databaseConnection, UriKind.Absolute, out var databaseUri)
     databaseConnection = new NpgsqlConnectionStringBuilder
     {
         Host = databaseUri.Host,
-        Port = databaseUri.Port,
+        Port = databaseUri.IsDefaultPort ? 5432 : databaseUri.Port,
         Database = databaseUri.AbsolutePath.TrimStart('/'),
         Username = Uri.UnescapeDataString(credentials[0]),
         Password = credentials.Length > 1 ? Uri.UnescapeDataString(credentials[1]) : string.Empty,
