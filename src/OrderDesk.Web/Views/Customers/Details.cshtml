@@ -1,0 +1,35 @@
+@model CustomerDetailVm
+@{ ViewData["Title"] = Model.Customer.Name; }
+<a class="back" asp-action="Index">← Todos los clientes</a>
+<section class="detail-header">
+    <div class="identity"><div class="avatar avatar-large">@string.Join("", Model.Customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div><div><p class="eyebrow">CLIENTE #@Model.Customer.Id.ToString("D4")</p><h1>@Model.Customer.Name</h1><p>@Model.Customer.Email · @(Model.Customer.Phone ?? "Sin teléfono")</p></div></div>
+    <div class="actions"><a class="button button-secondary" asp-action="Edit" asp-route-id="@Model.Customer.Id">Editar</a><a class="button" asp-controller="Orders" asp-action="Create" asp-route-customerId="@Model.Customer.Id">+ Nuevo pedido</a></div>
+</section>
+
+<div class="detail-grid">
+    <section class="panel orders-panel">
+        <div class="panel-title"><div><p class="eyebrow">ACTIVIDAD</p><h2>Pedidos</h2></div><span class="counter">@Model.Customer.Orders.Count</span></div>
+        @if (Model.Customer.Orders.Count == 0) { <div class="empty compact"><h3>Todavía no hay pedidos</h3><p>Creá el primero para empezar el seguimiento.</p></div> }
+        @foreach (var order in Model.Customer.Orders)
+        {
+            <article class="order-row">
+                <div><strong>@order.Number</strong><p>@order.Description</p><small>@order.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</small></div>
+                <strong class="amount">@order.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong>
+                <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form">
+                    <input type="hidden" name="id" value="@order.Id" />
+                    <select name="status" onchange="this.form.submit()" aria-label="Estado de @order.Number">
+                        @foreach (var status in Enum.GetValues<OrderStatus>()) { <option value="@status" selected="@(status == order.Status)">@OrdersController.StatusLabel(status)</option> }
+                    </select>
+                </form>
+            </article>
+        }
+    </section>
+    <aside>
+        <section class="panel insight">
+            <div class="panel-title"><div><p class="eyebrow">FUENTE EXTERNA</p><h2>Perfil comercial</h2></div><span class="live-dot" title="Consultado en tiempo real"></span></div>
+            @if (Model.Insight is null) { <div class="api-offline"><strong>Datos no disponibles</strong><p>La gestión local continúa funcionando.</p></div> }
+            else { <div class="score"><strong>@Model.Insight.RiskScore</strong><span>/ 100</span></div><dl><div><dt>Segmento</dt><dd>@Model.Insight.Segment</dd></div><div><dt>Recomendación</dt><dd>@Model.Insight.Recommendation</dd></div></dl><small>Actualizado @Model.Insight.CheckedAtUtc.ToLocalTime().ToString("HH:mm")</small> }
+        </section>
+        <section class="panel contact"><p class="eyebrow">CONTACTO</p><dl><div><dt>Email</dt><dd>@Model.Customer.Email</dd></div><div><dt>Teléfono</dt><dd>@(Model.Customer.Phone ?? "—")</dd></div><div><dt>Dirección</dt><dd>@(Model.Customer.Address ?? "—")</dd></div></dl></section>
+    </aside>
+</div>

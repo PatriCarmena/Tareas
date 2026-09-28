@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: orderdesk
+      POSTGRES_USER: orderdesk
+      POSTGRES_PASSWORD: orderdesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - orderdesk-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderdesk -d orderdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  external-api:
+    build: ./src/OrderDesk.ExternalApi
+    ports:
+      - "5081:8080"
+
+  web:
+    build: ./src/OrderDesk.Web
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PostgreSQL: Host=postgres;Port=5432;Database=orderdesk;Username=orderdesk;Password=orderdesk
+      ExternalApi__BaseUrl: http://external-api:8080
+      Webhook__Secret: ${WEBHOOK_SECRET:-development-secret}
+    ports:
+      - "5080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      external-api:
+        condition: service_started
+
+volumes:
+  orderdesk-data:

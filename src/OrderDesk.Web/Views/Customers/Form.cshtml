@@ -1,0 +1,19 @@
+@model Customer
+@{ var editing = Model.Id > 0; ViewData["Title"] = editing ? "Editar cliente" : "Nuevo cliente"; }
+<div class="narrow">
+    <a class="back" href="@(editing ? Url.Action("Details", new { id = Model.Id }) : Url.Action("Index"))">← Volver</a>
+    <div class="form-card">
+        <p class="eyebrow">CLIENTE</p><h1>@(editing ? "Editar datos" : "Nuevo cliente")</h1>
+        <form asp-action="@(editing ? "Edit" : "Create")" method="post">
+            <input asp-for="Id" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+            <div class="field"><label asp-for="Name"></label><input asp-for="Name" autofocus /><span asp-validation-for="Name"></span></div>
+            <div class="field"><label asp-for="Email"></label><input asp-for="Email" /><span asp-validation-for="Email"></span></div>
+            <div class="field-row">
+                <div class="field"><label asp-for="Phone"></label><input asp-for="Phone" /><span asp-validation-for="Phone"></span></div>
+                <div class="field"><label asp-for="Address"></label><input asp-for="Address" /><span asp-validation-for="Address"></span></div>
+            </div>
+            <div class="form-actions"><a class="button button-secondary" href="@(editing ? Url.Action("Details", new { id = Model.Id }) : Url.Action("Index"))">Cancelar</a><button class="button" type="submit">@(editing ? "Guardar cambios" : "Crear cliente")</button></div>
+        </form>
+    </div>
+</div>

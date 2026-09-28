@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: nexo-clientes-pedidos
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./src/OrderDesk.Web/Dockerfile
+    dockerContext: ./src/OrderDesk.Web
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__PostgreSQL
+        fromDatabase:
+          name: nexo-postgres
+          property: connectionString
+      - key: ExternalApi__Host
+        fromService:
+          type: web
+          name: nexo-external-api
+          property: host
+      - key: Webhook__Secret
+        generateValue: true
+
+  - type: web
+    name: nexo-external-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./src/OrderDesk.ExternalApi/Dockerfile
+    dockerContext: ./src/OrderDesk.ExternalApi
+    healthCheckPath: /health
+
+databases:
+  - name: nexo-postgres
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
+    databaseName: orderdesk
+    user: orderdesk
+    ipAllowList: []

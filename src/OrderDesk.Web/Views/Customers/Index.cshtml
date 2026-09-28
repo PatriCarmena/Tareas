@@ -1,0 +1,47 @@
+@model CustomerListVm
+@{ ViewData["Title"] = "Clientes y pedidos"; }
+
+<section class="page-heading">
+    <div><p class="eyebrow">OPERACIONES</p><h1>Clientes y pedidos</h1><p class="subtle">Todo lo que necesitás para seguir cada relación comercial.</p></div>
+    <a class="button" asp-action="Create">+ Nuevo cliente</a>
+</section>
+
+<form method="get" class="filters">
+    <label class="search"><span class="sr-only">Buscar</span><span aria-hidden="true">⌕</span><input name="query" value="@Model.Query" placeholder="Buscar cliente, email o N.º de pedido" /></label>
+    <select name="status" aria-label="Filtrar por estado">
+        <option value="">Todos los estados</option>
+        @foreach (var status in Enum.GetValues<OrderStatus>()) { <option value="@status" selected="@(Model.Status == status)">@OrdersController.StatusLabel(status)</option> }
+    </select>
+    <button class="button button-secondary" type="submit">Filtrar</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Query) || Model.Status.HasValue) { <a class="text-link" asp-action="Index">Limpiar</a> }
+</form>
+
+<div class="summary-grid">
+    <div class="metric"><span>Clientes</span><strong>@Model.Customers.Count</strong></div>
+    <div class="metric"><span>Pedidos visibles</span><strong>@Model.Customers.Sum(x => x.Orders.Count)</strong></div>
+    <div class="metric accent"><span>Valor total</span><strong>@Model.Customers.Sum(x => x.Orders.Sum(o => o.Total)).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div>
+</div>
+
+@if (Model.Customers.Count == 0)
+{
+    <div class="empty"><span>⌕</span><h2>Sin resultados</h2><p>Probá con otros términos o quitá los filtros.</p></div>
+}
+else
+{
+    <div class="customer-grid">
+    @foreach (var customer in Model.Customers)
+    {
+        var latest = customer.Orders.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
+        <a class="customer-card" asp-action="Details" asp-route-id="@customer.Id">
+            <div class="avatar">@string.Join("", customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div>
+            <div class="card-main"><h2>@customer.Name</h2><p>@customer.Email</p></div>
+            <div class="order-count"><strong>@customer.Orders.Count</strong><span>pedidos</span></div>
+            <div class="latest">
+                @if (latest is not null) { <span class="status status-@latest.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(latest.Status)</span><strong>@latest.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong> }
+                else { <span class="subtle">Sin pedidos</span> }
+            </div>
+            <span class="arrow">→</span>
+        </a>
+    }
+    </div>
+}

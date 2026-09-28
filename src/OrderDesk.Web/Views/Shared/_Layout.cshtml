@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · Nexo</title>
+    <meta name="description" content="Gestión de clientes y pedidos" />
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" asp-controller="Customers" asp-action="Index" aria-label="Nexo, inicio">
+            <span class="brand-mark">N</span><span>Nexo</span>
+        </a>
+        <nav><a asp-controller="Customers" asp-action="Index">Clientes</a><a class="button button-small" asp-controller="Customers" asp-action="Create">+ Nuevo cliente</a></nav>
+    </header>
+    <main class="shell">
+        @if (TempData["Success"] is string success) { <div class="toast" role="status">@success</div> }
+        @RenderBody()
+    </main>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
