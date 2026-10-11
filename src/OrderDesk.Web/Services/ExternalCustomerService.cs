@@ -13,7 +13,21 @@ public sealed class ExternalCustomerService(HttpClient httpClient, ILogger<Exter
     {
         try
         {
-            return await httpClient.GetFromJsonAsync<CustomerInsight>($"/api/customer-insights/{customerId}", cancellationToken);
+            for (var attempt = 1; attempt <= 10; attempt++)
+            {
+                using var response = await httpClient.GetAsync($"/api/customer-insights/{customerId}", cancellationToken);
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadFromJsonAsync<CustomerInsight>(cancellationToken: cancellationToken);
+
+                var isColdStart = response.StatusCode is System.Net.HttpStatusCode.BadGateway
+                    or System.Net.HttpStatusCode.ServiceUnavailable
+                    or System.Net.HttpStatusCode.GatewayTimeout;
+                if (!isColdStart || attempt == 10) response.EnsureSuccessStatusCode();
+
+                logger.LogInformation("La API externa se está reactivando. Reintento {Attempt}/10", attempt);
+                await Task.Delay(TimeSpan.FromSeconds(6), cancellationToken);
+            }
+            return null;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
