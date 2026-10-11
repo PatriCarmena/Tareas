@@ -3,7 +3,7 @@
 <a class="back" asp-action="Index">← Todos los clientes</a>
 <section class="detail-header">
     <div class="identity"><div class="avatar avatar-large">@string.Join("", Model.Customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div><div><p class="eyebrow">CLIENTE #@Model.Customer.Id.ToString("D4")</p><h1>@Model.Customer.Name</h1><p>@Model.Customer.Email · @(Model.Customer.Phone ?? "Sin teléfono")</p></div></div>
-    <div class="actions"><a class="button button-secondary" asp-action="Edit" asp-route-id="@Model.Customer.Id">Editar</a><a class="button" asp-controller="Orders" asp-action="Create" asp-route-customerId="@Model.Customer.Id">+ Nuevo pedido</a></div>
+    @if (!User.IsInRole(AppRoles.Viewer)) { <div class="actions"><a class="button button-secondary" asp-action="Edit" asp-route-id="@Model.Customer.Id">Editar</a><a class="button" asp-controller="Orders" asp-action="Create" asp-route-customerId="@Model.Customer.Id">+ Nuevo pedido</a></div> }
 </section>
 
 <div class="detail-grid">
@@ -15,12 +15,13 @@
             <article class="order-row">
                 <div><strong>@order.Number</strong><p>@order.Description</p><small>@order.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</small></div>
                 <strong class="amount">@order.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong>
-                <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form">
+                @if (!User.IsInRole(AppRoles.Viewer)) { <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form">
                     <input type="hidden" name="id" value="@order.Id" />
                     <select name="status" onchange="this.form.submit()" aria-label="Estado de @order.Number">
                         @foreach (var status in Enum.GetValues<OrderStatus>()) { <option value="@status" selected="@(status == order.Status)">@OrdersController.StatusLabel(status)</option> }
                     </select>
-                </form>
+                </form> } else { <span class="status status-@order.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(order.Status)</span> }
+                @if (order.StatusHistory.Count > 0) { <details class="history"><summary>Historial (@order.StatusHistory.Count)</summary>@foreach (var change in order.StatusHistory) { <div><small>@change.ChangedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · @change.Source</small><span>@(change.PreviousStatus.HasValue ? OrdersController.StatusLabel(change.PreviousStatus.Value) + " → " : "")@OrdersController.StatusLabel(change.NewStatus)</span></div> }</details> }
             </article>
         }
     </section>

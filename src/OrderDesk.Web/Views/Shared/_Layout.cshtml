@@ -7,16 +7,21 @@
     <meta name="description" content="Gestión de clientes y pedidos" />
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/features.css" asp-append-version="true" />
 </head>
 <body>
     <header class="topbar">
-        <a class="brand" asp-controller="Customers" asp-action="Index" aria-label="Nexo, inicio">
+        <a class="brand" asp-controller="Dashboard" asp-action="Index" aria-label="Nexo, inicio">
             <span class="brand-mark">N</span><span>Nexo</span>
         </a>
-        <nav><a asp-controller="Customers" asp-action="Index">Clientes</a><a class="button button-small" asp-controller="Customers" asp-action="Create">+ Nuevo cliente</a></nav>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <nav><a asp-controller="Dashboard" asp-action="Index">Dashboard</a><a asp-controller="Customers" asp-action="Index">Clientes</a><a asp-controller="Orders" asp-action="Index">Pedidos</a>@if (User.IsInRole(AppRoles.Administrator)) { <a asp-controller="Users" asp-action="Index">Usuarios</a> }<form asp-controller="Account" asp-action="Logout" method="post"><button class="nav-link" type="submit">Salir</button></form></nav>
+        }
     </header>
     <main class="shell">
         @if (TempData["Success"] is string success) { <div class="toast" role="status">@success</div> }
+        @if (TempData["Error"] is string error) { <div class="toast toast-error" role="alert">@error</div> }
         @RenderBody()
     </main>
     <script src="~/js/site.js" asp-append-version="true"></script>

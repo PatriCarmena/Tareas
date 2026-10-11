@@ -4,26 +4,38 @@ using OrderDesk.Web.Data;
 using OrderDesk.Web.Models;
 using OrderDesk.Web.Services;
 using OrderDesk.Web.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 
 namespace OrderDesk.Web.Controllers;
 
+[Authorize]
 public sealed class CustomersController(AppDbContext db, IExternalCustomerService external) : Controller
 {
-    public async Task<IActionResult> Index(string? query, OrderStatus? status, CancellationToken ct)
+    public async Task<IActionResult> Index(string? query, OrderStatus? status, int page = 1, CancellationToken ct = default)
     {
-        var customers = db.Customers.Include(x => x.Orders).AsNoTracking().AsQueryable();
+        const int pageSize = 10;
+        page = Math.Max(1, page);
+        var customers = db.Customers.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(query))
         {
             var term = query.Trim();
             customers = customers.Where(x => EF.Functions.ILike(x.Name, $"%{term}%") || EF.Functions.ILike(x.Email, $"%{term}%") || x.Orders.Any(o => EF.Functions.ILike(o.Number, $"%{term}%")));
         }
         if (status.HasValue) customers = customers.Where(x => x.Orders.Any(o => o.Status == status));
-        return View(new CustomerListVm(await customers.OrderBy(x => x.Name).ToListAsync(ct), query, status));
+        var total = await customers.CountAsync(ct);
+        var items = await customers.OrderBy(x => x.Name).Skip((page - 1) * pageSize).Take(pageSize).Select(x => new Customer
+        {
+            Id = x.Id, Name = x.Name, Email = x.Email, Phone = x.Phone, Address = x.Address,
+            Orders = x.Orders.Where(o => !status.HasValue || o.Status == status).OrderByDescending(o => o.CreatedAtUtc).ToList()
+        }).ToListAsync(ct);
+        return View(new CustomerListVm(items, query, status, page, Math.Max(1, (int)Math.Ceiling(total / (double)pageSize)), total));
     }
 
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public IActionResult Create() => View("Form", new Customer());
 
     [HttpPost, ValidateAntiForgeryToken]
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public async Task<IActionResult> Create(Customer customer, CancellationToken ct)
     {
         if (!ModelState.IsValid) return View("Form", customer);
@@ -33,6 +45,7 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
         return RedirectToAction(nameof(Details), new { id = customer.Id });
     }
 
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public async Task<IActionResult> Edit(int id, CancellationToken ct)
     {
         var customer = await db.Customers.FindAsync([id], ct);
@@ -40,6 +53,7 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
     }
 
     [HttpPost, ValidateAntiForgeryToken]
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public async Task<IActionResult> Edit(int id, Customer input, CancellationToken ct)
     {
         if (id != input.Id) return BadRequest();
@@ -54,7 +68,7 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
 
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
-        var customer = await db.Customers.Include(x => x.Orders.OrderByDescending(o => o.CreatedAtUtc)).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        var customer = await db.Customers.Include(x => x.Orders.OrderByDescending(o => o.CreatedAtUtc)).ThenInclude(o => o.StatusHistory.OrderByDescending(h => h.ChangedAtUtc)).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
         if (customer is null) return NotFound();
         var insight = await external.GetInsightAsync(id, ct);
         return View(new CustomerDetailVm(customer, insight));

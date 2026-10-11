@@ -12,6 +12,8 @@ docker compose up --build
 
 Luego abrir `http://localhost:5080`. La base de datos se migra y carga con datos de demostración automáticamente. La API externa queda disponible en `http://localhost:5081`.
 
+Usuario administrador local: `admin@nexo.local` / `NexoAdmin!2026`. Esta contraseña solo se usa en Development; en Render se genera una distinta.
+
 Para detener los servicios sin borrar los datos:
 
 ```powershell
@@ -48,7 +50,7 @@ En producción, definir secretos y credenciales fuera del repositorio, habilitar
 
 ## Publicación en Render
 
-El archivo `render.yaml` describe la aplicación, la API externa y PostgreSQL. Al crear un Blueprint en Render desde este repositorio se aprovisionan los tres recursos, se ejecutan las migraciones al iniciar y se genera automáticamente `Webhook__Secret`.
+El archivo `render.yaml` describe la aplicación, la API externa y PostgreSQL. Al crear un Blueprint en Render desde este repositorio se aprovisionan los tres recursos, se ejecutan las migraciones al iniciar y se generan automáticamente `Webhook__Secret` y `SeedAdmin__Password`.
 
 Endpoints públicos esperados:
 
@@ -57,4 +59,11 @@ Endpoints públicos esperados:
 - Webhook: `POST /api/webhooks/orders`
 - API externa: `https://nexo-external-api.onrender.com/api/customer-insights/{customerId}`
 
-El secreto real del webhook se consulta en **Render → nexo-clientes-pedidos → Environment → Webhook__Secret**. No debe publicarse en el repositorio.
+Los valores reales se consultan en **Render → nexo-clientes-pedidos → Environment**. No deben publicarse en el repositorio:
+
+- `SeedAdmin__Email` y `SeedAdmin__Password`: primer acceso administrativo.
+- `Webhook__Secret`: autenticación del webhook.
+- `Google__ClientId` y `Google__ClientSecret`: OAuth de Google. En Google Cloud registrar `https://nexo-clientes-pedidos.onrender.com/signin-google` como URI de redirección.
+- `Twilio__AccountSid`, `Twilio__AuthToken` y `Twilio__WhatsAppFrom`: recuperación por WhatsApp. Los usuarios deben tener teléfono en formato internacional.
+
+El plan gratuito de Render suspende los servicios inactivos, por lo que el primer acceso puede demorar. Evitar ese arranque en frío requiere cambiar el servicio web y, si corresponde, la API externa a un plan de pago.

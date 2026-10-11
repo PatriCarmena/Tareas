@@ -1,0 +1,5 @@
+@model DashboardVm
+@{ ViewData["Title"] = "Dashboard"; }
+<section class="page-heading"><div><p class="eyebrow">RESUMEN</p><h1>Dashboard</h1><p class="subtle">Los pedidos cancelados están excluidos de todas las métricas.</p></div></section>
+<div class="summary-grid"><div class="metric"><span>Clientes</span><strong>@Model.CustomerCount</strong></div><div class="metric"><span>Pedidos activos</span><strong>@Model.OrderCount</strong></div><div class="metric accent"><span>Monto activo</span><strong>@Model.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div></div>
+<div class="dashboard-grid">@foreach (var row in Model.ByStatus) { <article class="panel"><span class="status status-@row.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(row.Status)</span><strong class="dashboard-number">@row.Count</strong><p>@row.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</p></article> }</div>

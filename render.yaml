@@ -14,13 +14,24 @@ services:
         fromDatabase:
           name: nexo-postgres
           property: connectionString
-      - key: ExternalApi__Host
-        fromService:
-          type: web
-          name: nexo-external-api
-          property: host
+      - key: ExternalApi__BaseUrl
+        value: https://nexo-external-api.onrender.com
       - key: Webhook__Secret
         generateValue: true
+      - key: SeedAdmin__Email
+        value: admin@nexo.local
+      - key: SeedAdmin__Password
+        generateValue: true
+      - key: Google__ClientId
+        sync: false
+      - key: Google__ClientSecret
+        sync: false
+      - key: Twilio__AccountSid
+        sync: false
+      - key: Twilio__AuthToken
+        sync: false
+      - key: Twilio__WhatsAppFrom
+        sync: false
 
   - type: web
     name: nexo-external-api

@@ -25,4 +25,5 @@ public sealed class Order
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     public List<WebhookReceipt> WebhookReceipts { get; set; } = [];
+    public List<OrderStatusHistory> StatusHistory { get; set; } = [];
 }

@@ -1,0 +1,9 @@
+@model PaginationVm
+@if (Model.TotalPages > 1)
+{
+<nav class="pagination" aria-label="Paginación">
+    <a class="button button-secondary @(Model.Page == 1 ? "disabled" : "")" asp-route-page="@(Model.Page - 1)" asp-route-query="@Model.Query" asp-route-status="@Model.Status">← Anterior</a>
+    <span>Página @Model.Page de @Model.TotalPages</span>
+    <a class="button button-secondary @(Model.Page == Model.TotalPages ? "disabled" : "")" asp-route-page="@(Model.Page + 1)" asp-route-query="@Model.Query" asp-route-status="@Model.Status">Siguiente →</a>
+</nav>
+}

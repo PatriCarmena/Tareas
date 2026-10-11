@@ -1,10 +1,33 @@
 using Microsoft.EntityFrameworkCore;
 using OrderDesk.Web.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace OrderDesk.Web.Data;
 
 public static class DbSeeder
 {
+    public static async Task SeedIdentityAsync(IServiceProvider services, IConfiguration configuration, IWebHostEnvironment environment)
+    {
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        foreach (var role in AppRoles.All)
+            if (!await roleManager.RoleExistsAsync(role)) await roleManager.CreateAsync(new IdentityRole(role));
+
+        var email = configuration["SeedAdmin:Email"] ?? "admin@nexo.local";
+        var password = configuration["SeedAdmin:Password"];
+        if (string.IsNullOrWhiteSpace(password) && environment.IsDevelopment()) password = "NexoAdmin!2026";
+        if (string.IsNullOrWhiteSpace(password)) return;
+
+        var users = services.GetRequiredService<UserManager<AppUser>>();
+        var admin = await users.FindByEmailAsync(email);
+        if (admin is null)
+        {
+            admin = new AppUser { UserName = email, Email = email, FullName = "Administrador Nexo", EmailConfirmed = true };
+            var result = await users.CreateAsync(admin, password);
+            if (!result.Succeeded) throw new InvalidOperationException(string.Join("; ", result.Errors.Select(x => x.Description)));
+        }
+        if (!await users.IsInRoleAsync(admin, AppRoles.Administrator)) await users.AddToRoleAsync(admin, AppRoles.Administrator);
+    }
+
     public static async Task SeedAsync(AppDbContext db)
     {
         if (await db.Customers.AnyAsync()) return;

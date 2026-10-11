@@ -3,7 +3,7 @@
 
 <section class="page-heading">
     <div><p class="eyebrow">OPERACIONES</p><h1>Clientes y pedidos</h1><p class="subtle">Todo lo que necesitás para seguir cada relación comercial.</p></div>
-    <a class="button" asp-action="Create">+ Nuevo cliente</a>
+    @if (!User.IsInRole(AppRoles.Viewer)) { <a class="button" asp-action="Create">+ Nuevo cliente</a> }
 </section>
 
 <form method="get" class="filters">
@@ -17,9 +17,9 @@
 </form>
 
 <div class="summary-grid">
-    <div class="metric"><span>Clientes</span><strong>@Model.Customers.Count</strong></div>
+    <div class="metric"><span>Clientes encontrados</span><strong>@Model.TotalItems</strong></div>
     <div class="metric"><span>Pedidos visibles</span><strong>@Model.Customers.Sum(x => x.Orders.Count)</strong></div>
-    <div class="metric accent"><span>Valor total</span><strong>@Model.Customers.Sum(x => x.Orders.Sum(o => o.Total)).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div>
+    <div class="metric accent"><span>Valor activo visible</span><strong>@Model.Customers.Sum(x => x.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.Total)).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div>
 </div>
 
 @if (Model.Customers.Count == 0)
@@ -44,4 +44,5 @@ else
         </a>
     }
     </div>
+    <partial name="_Pagination" model="@(new PaginationVm(Model.Page, Model.TotalPages, Model.Query, Model.Status))" />
 }
