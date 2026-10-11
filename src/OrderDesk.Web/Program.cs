@@ -70,7 +70,9 @@ builder.Services.AddHttpClient<IExternalCustomerService, ExternalCustomerService
     var externalBaseUrl = builder.Configuration["ExternalApi:BaseUrl"];
     var externalHost = builder.Configuration["ExternalApi:Host"];
     client.BaseAddress = new Uri(externalBaseUrl ?? (externalHost is null ? "http://localhost:5081" : $"http://{externalHost}"));
-    client.Timeout = TimeSpan.FromSeconds(15);
+    // La API externa también usa el plan gratuito de Render y puede necesitar
+    // cerca de un minuto para reactivarse después de un período de inactividad.
+    client.Timeout = TimeSpan.FromSeconds(75);
 });
 
 var app = builder.Build();
