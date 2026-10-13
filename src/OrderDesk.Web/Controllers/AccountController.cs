@@ -48,10 +48,26 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
         if (!result.Succeeded)
         {
             var email = info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-            if (string.IsNullOrWhiteSpace(email)) return RedirectToAction(nameof(Login));
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                TempData["Error"] = "Google no proporcionó un correo válido.";
+                return RedirectToAction(nameof(Login));
+            }
+
             var user = await userManager.FindByEmailAsync(email);
-            if (user is null) { user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, FullName = info.Principal.Identity?.Name ?? email }; var created = await userManager.CreateAsync(user); if (!created.Succeeded) return RedirectToAction(nameof(Login)); }
-            await userManager.AddLoginAsync(user, info);
+            if (user is null)
+            {
+                TempData["Error"] = "No existe un usuario de Nexo registrado con esa cuenta de Google.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            var loginAdded = await userManager.AddLoginAsync(user, info);
+            if (!loginAdded.Succeeded)
+            {
+                TempData["Error"] = "No se pudo vincular la cuenta de Google con el usuario de Nexo.";
+                return RedirectToAction(nameof(Login));
+            }
+
             if (!(await userManager.GetRolesAsync(user)).Any()) await userManager.AddToRoleAsync(user, AppRoles.Viewer);
             await signInManager.SignInAsync(user, false);
         }
