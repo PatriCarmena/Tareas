@@ -30,6 +30,12 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
             ["From"] = $"whatsapp:{From}", ["To"] = $"whatsapp:{phoneNumber}", ["Body"] = $"Tu código de recuperación de Nexo es {code}. Vence en 15 minutos."
         });
         using var response = await http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError("Twilio rechazó el mensaje de WhatsApp con estado {StatusCode}: {ResponseBody}",
+                (int)response.StatusCode, responseBody);
+            throw new InvalidOperationException("Twilio no pudo enviar el código de recuperación.");
+        }
     }
 }
