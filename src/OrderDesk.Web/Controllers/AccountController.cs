@@ -35,7 +35,8 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
     {
         if (string.IsNullOrWhiteSpace(configuration["Google:ClientId"])) { TempData["Error"] = "El acceso con Google aún no está configurado."; return RedirectToAction(nameof(Login)); }
         var redirect = Url.Action(nameof(GoogleCallback), new { returnUrl });
-        return Challenge(new AuthenticationProperties { RedirectUri = redirect }, "Google");
+        var properties = signInManager.ConfigureExternalAuthenticationProperties("Google", redirect);
+        return Challenge(properties, "Google");
     }
 
     [AllowAnonymous]
