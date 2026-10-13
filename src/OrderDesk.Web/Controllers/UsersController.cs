@@ -36,4 +36,28 @@ public sealed class UsersController(UserManager<AppUser> userManager) : Controll
         var current = await userManager.GetRolesAsync(user); await userManager.RemoveFromRolesAsync(user, current); await userManager.AddToRoleAsync(user, role);
         TempData["Success"] = "Rol actualizado."; return RedirectToAction(nameof(Index));
     }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePhone(string id, string? phoneNumber)
+    {
+        var user = await userManager.FindByIdAsync(id);
+        if (user is null) return NotFound();
+
+        var normalizedPhone = string.IsNullOrWhiteSpace(phoneNumber)
+            ? null
+            : phoneNumber.Trim().Replace(" ", "").Replace("-", "");
+
+        if (normalizedPhone is not null &&
+            (!normalizedPhone.StartsWith('+') || normalizedPhone.Skip(1).Any(character => !char.IsDigit(character))))
+        {
+            TempData["Error"] = "El WhatsApp debe usar formato internacional, por ejemplo +5493811234567.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await userManager.SetPhoneNumberAsync(user, normalizedPhone);
+        TempData[result.Succeeded ? "Success" : "Error"] = result.Succeeded
+            ? "WhatsApp actualizado correctamente."
+            : "No se pudo actualizar el WhatsApp.";
+        return RedirectToAction(nameof(Index));
+    }
 }
