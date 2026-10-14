@@ -23,8 +23,10 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
         if (!ModelState.IsValid) return View(model);
         var result = await signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: true);
         if (result.Succeeded) return LocalRedirect(model.ReturnUrl ?? Url.Action("Index", "Dashboard")!);
-        ModelState.AddModelError(string.Empty, "Email o contraseña incorrectos.");
-        return View(model);
+        TempData["Error"] = result.IsLockedOut
+            ? "La cuenta está temporalmente bloqueada por varios intentos fallidos. Intentá nuevamente más tarde."
+            : "No se pudo iniciar sesión. Revisá el email y la contraseña e intentá nuevamente.";
+        return RedirectToAction(nameof(Login), new { returnUrl = model.ReturnUrl });
     }
 
     [HttpPost, Authorize, ValidateAntiForgeryToken]

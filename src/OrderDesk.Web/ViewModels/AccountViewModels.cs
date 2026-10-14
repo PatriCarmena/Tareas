@@ -26,4 +26,13 @@ public sealed class CreateUserVm
     [Required, DataType(DataType.Password), MinLength(8)] public string Password { get; set; } = string.Empty;
     [Required] public string Role { get; set; } = AppRoles.Viewer;
 }
+public sealed class EditUserVm
+{
+    [Required] public string Id { get; set; } = string.Empty;
+    [Required, StringLength(120)] public string FullName { get; set; } = string.Empty;
+    [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+    [Phone] public string? PhoneNumber { get; set; }
+    [DataType(DataType.Password), MinLength(8)] public string? NewPassword { get; set; }
+    [Required] public string Role { get; set; } = AppRoles.Viewer;
+}
 public sealed record UserListItemVm(string Id, string FullName, string Email, string? Phone, string Role);
