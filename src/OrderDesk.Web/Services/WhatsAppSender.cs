@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace OrderDesk.Web.Services;
 
@@ -13,6 +14,7 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
     private string? AccountSid => configuration["Twilio:AccountSid"];
     private string? AuthToken => configuration["Twilio:AuthToken"];
     private string? From => configuration["Twilio:WhatsAppFrom"];
+    private string? ContentSid => configuration["Twilio:ContentSid"];
     public bool IsConfigured => !string.IsNullOrWhiteSpace(AccountSid) && !string.IsNullOrWhiteSpace(AuthToken) && !string.IsNullOrWhiteSpace(From);
 
     public async Task SendResetCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
@@ -25,10 +27,27 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json");
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{AccountSid}:{AuthToken}")));
-        request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        var form = new Dictionary<string, string>
         {
-            ["From"] = $"whatsapp:{From}", ["To"] = $"whatsapp:{phoneNumber}", ["Body"] = $"Tu código de recuperación de Nexo es {code}. Vence en 15 minutos."
-        });
+            ["From"] = $"whatsapp:{From}",
+            ["To"] = $"whatsapp:{phoneNumber}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(ContentSid))
+        {
+            form["ContentSid"] = ContentSid;
+            form["ContentVariables"] = JsonSerializer.Serialize(new Dictionary<string, string>
+            {
+                ["1"] = $"Código Nexo: {code}",
+                ["2"] = "válido durante 15 minutos"
+            });
+        }
+        else
+        {
+            form["Body"] = $"Tu código de recuperación de Nexo es {code}. Vence en 15 minutos.";
+        }
+
+        request.Content = new FormUrlEncodedContent(form);
         using var response = await http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
