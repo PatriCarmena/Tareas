@@ -25,22 +25,24 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
             throw new InvalidOperationException("El envío por WhatsApp todavía no está configurado.");
         }
 
+        var authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{AccountSid}:{AuthToken}")));
+        var content = await FindTrialContentAsync(authorization, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{AccountSid}:{AuthToken}")));
+        request.Headers.Authorization = authorization;
         var form = new Dictionary<string, string>
         {
             ["From"] = $"whatsapp:{From}",
             ["To"] = $"whatsapp:{phoneNumber}"
         };
 
-        if (!string.IsNullOrWhiteSpace(ContentSid))
+        var contentSid = content?.Sid ?? ContentSid;
+        if (!string.IsNullOrWhiteSpace(contentSid))
         {
-            form["ContentSid"] = ContentSid;
-            form["ContentVariables"] = JsonSerializer.Serialize(new Dictionary<string, string>
-            {
-                ["1"] = $"Código Nexo: {code}",
-                ["2"] = "válido durante 15 minutos"
-            });
+            form["ContentSid"] = contentSid;
+            var variableNames = content?.Variables ?? ["1", "2"];
+            form["ContentVariables"] = JsonSerializer.Serialize(variableNames
+                .Select((name, index) => new { name, value = index == 0 ? $"Código Nexo: {code}" : "válido durante 15 minutos" })
+                .ToDictionary(x => x.name, x => x.value));
         }
         else
         {
@@ -57,4 +59,36 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
             throw new InvalidOperationException("Twilio no pudo enviar el código de recuperación.");
         }
     }
+
+    private async Task<TrialContent?> FindTrialContentAsync(AuthenticationHeaderValue authorization, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "https://content.twilio.com/v1/Content?PageSize=50");
+        request.Headers.Authorization = authorization;
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("No se pudieron consultar las plantillas de Twilio. Estado {StatusCode}.", (int)response.StatusCode);
+            return null;
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (!document.RootElement.TryGetProperty("contents", out var contents)) return null;
+
+        var available = contents.EnumerateArray()
+            .Select(item => new TrialContent(
+                item.GetProperty("sid").GetString()!,
+                item.TryGetProperty("friendly_name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                item.TryGetProperty("variables", out var variables) && variables.ValueKind == JsonValueKind.Object
+                    ? variables.EnumerateObject().Select(x => x.Name).ToArray()
+                    : []))
+            .ToArray();
+
+        logger.LogInformation("Twilio devolvió {Count} plantillas de contenido: {Templates}", available.Length,
+            string.Join(", ", available.Select(x => $"{x.Name} ({x.Sid})")));
+        return available.FirstOrDefault(x => x.Name.Contains("appointment", StringComparison.OrdinalIgnoreCase))
+            ?? available.FirstOrDefault();
+    }
+
+    private sealed record TrialContent(string Sid, string Name, string[] Variables);
 }
