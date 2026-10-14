@@ -65,6 +65,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     });
 }
 builder.Services.AddHttpClient<IWhatsAppSender, TwilioWhatsAppSender>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHttpClient<IExternalCustomerService, ExternalCustomerService>(client =>
 {
     var externalBaseUrl = builder.Configuration["ExternalApi:BaseUrl"];

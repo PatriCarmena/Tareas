@@ -12,7 +12,7 @@ using System.Security.Cryptography;
 namespace OrderDesk.Web.Controllers;
 
 public sealed class AccountController(SignInManager<AppUser> signInManager, UserManager<AppUser> userManager,
-    AppDbContext db, IWhatsAppSender whatsApp, IConfiguration configuration) : Controller
+    AppDbContext db, IEmailSender emailSender, IConfiguration configuration) : Controller
 {
     [AllowAnonymous]
     public IActionResult Login(string? returnUrl = null) => View(new LoginVm { ReturnUrl = returnUrl });
@@ -83,24 +83,24 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
     {
         if (!ModelState.IsValid) return View(model);
         var user = await userManager.FindByEmailAsync(model.Email);
-        if (user is not null && !string.IsNullOrWhiteSpace(user.PhoneNumber) && whatsApp.IsConfigured)
+        if (user is not null && !string.IsNullOrWhiteSpace(user.Email) && emailSender.IsConfigured)
         {
             var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
             var entry = new PasswordResetCode { UserId = user.Id, ResetToken = await userManager.GeneratePasswordResetTokenAsync(user), ExpiresAtUtc = DateTime.UtcNow.AddMinutes(15) };
             entry.CodeHash = new PasswordHasher<PasswordResetCode>().HashPassword(entry, code);
             try
             {
-                await whatsApp.SendResetCodeAsync(user.PhoneNumber, code, ct);
+                await emailSender.SendResetCodeAsync(user.Email, code, ct);
                 db.PasswordResetCodes.Add(entry);
                 await db.SaveChangesAsync(ct);
             }
             catch (InvalidOperationException)
             {
-                TempData["Error"] = "No pudimos enviar el código por WhatsApp. Verificá que el número asociado esté habilitado como destinatario en Twilio e intentá nuevamente.";
+                TempData["Error"] = "No pudimos enviar el código por correo electrónico. Revisá la configuración del servicio de correo e intentá nuevamente.";
                 return RedirectToAction(nameof(ForgotPassword));
             }
         }
-        TempData["Success"] = "Si la cuenta existe y tiene WhatsApp configurado, enviamos un código válido por 15 minutos.";
+        TempData["Success"] = "Si la cuenta existe, enviamos un código por correo electrónico válido durante 15 minutos.";
         return RedirectToAction(nameof(ResetPassword), new { email = model.Email });
     }
 
