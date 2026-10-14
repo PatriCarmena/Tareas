@@ -88,8 +88,17 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
             var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
             var entry = new PasswordResetCode { UserId = user.Id, ResetToken = await userManager.GeneratePasswordResetTokenAsync(user), ExpiresAtUtc = DateTime.UtcNow.AddMinutes(15) };
             entry.CodeHash = new PasswordHasher<PasswordResetCode>().HashPassword(entry, code);
-            db.PasswordResetCodes.Add(entry); await db.SaveChangesAsync(ct);
-            await whatsApp.SendResetCodeAsync(user.PhoneNumber, code, ct);
+            try
+            {
+                await whatsApp.SendResetCodeAsync(user.PhoneNumber, code, ct);
+                db.PasswordResetCodes.Add(entry);
+                await db.SaveChangesAsync(ct);
+            }
+            catch (InvalidOperationException)
+            {
+                TempData["Error"] = "No pudimos enviar el código por WhatsApp. Verificá que el número asociado esté habilitado como destinatario en Twilio e intentá nuevamente.";
+                return RedirectToAction(nameof(ForgotPassword));
+            }
         }
         TempData["Success"] = "Si la cuenta existe y tiene WhatsApp configurado, enviamos un código válido por 15 minutos.";
         return RedirectToAction(nameof(ResetPassword), new { email = model.Email });
