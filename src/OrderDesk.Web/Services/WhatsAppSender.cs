@@ -15,6 +15,8 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
     private string? AuthToken => configuration["Twilio:AuthToken"];
     private string? From => configuration["Twilio:WhatsAppFrom"];
     private string? ContentSid => configuration["Twilio:ContentSid"];
+    private string? ApiKeySid => configuration["Twilio:ApiKeySid"];
+    private string? ApiKeySecret => configuration["Twilio:ApiKeySecret"];
     public bool IsConfigured => !string.IsNullOrWhiteSpace(AccountSid) && !string.IsNullOrWhiteSpace(AuthToken) && !string.IsNullOrWhiteSpace(From);
 
     public async Task SendResetCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
@@ -26,7 +28,7 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
         }
 
         var authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{AccountSid}:{AuthToken}")));
-        var content = await FindTrialContentAsync(authorization, cancellationToken);
+        var content = await FindTrialContentAsync(cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json");
         request.Headers.Authorization = authorization;
         var form = new Dictionary<string, string>
@@ -60,8 +62,12 @@ public sealed class TwilioWhatsAppSender(HttpClient http, IConfiguration configu
         }
     }
 
-    private async Task<TrialContent?> FindTrialContentAsync(AuthenticationHeaderValue authorization, CancellationToken cancellationToken)
+    private async Task<TrialContent?> FindTrialContentAsync(CancellationToken cancellationToken)
     {
+        var username = string.IsNullOrWhiteSpace(ApiKeySid) ? AccountSid : ApiKeySid;
+        var password = string.IsNullOrWhiteSpace(ApiKeySecret) ? AuthToken : ApiKeySecret;
+        var authorization = new AuthenticationHeaderValue("Basic",
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{username}:{password}")));
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://content.twilio.com/v1/Content?PageSize=50");
         request.Headers.Authorization = authorization;
         using var response = await http.SendAsync(request, cancellationToken);
