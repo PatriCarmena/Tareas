@@ -65,7 +65,11 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     });
 }
 builder.Services.AddHttpClient<IWhatsAppSender, TwilioWhatsAppSender>();
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.brevo.com/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddHttpClient<IExternalCustomerService, ExternalCustomerService>(client =>
 {
     var externalBaseUrl = builder.Configuration["ExternalApi:BaseUrl"];

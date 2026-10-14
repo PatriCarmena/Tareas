@@ -1,5 +1,4 @@
-using System.Net;
-using System.Net.Mail;
+using System.Net.Http.Json;
 
 namespace OrderDesk.Web.Services;
 
@@ -9,19 +8,16 @@ public interface IEmailSender
     Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken);
 }
 
-public sealed class SmtpEmailSender(IConfiguration configuration, ILogger<SmtpEmailSender> logger) : IEmailSender
+public sealed class BrevoEmailSender(
+    HttpClient httpClient,
+    IConfiguration configuration,
+    ILogger<BrevoEmailSender> logger) : IEmailSender
 {
-    private string? Host => configuration["Email:SmtpHost"];
-    private int Port => configuration.GetValue("Email:SmtpPort", 587);
-    private string? Username => configuration["Email:Username"];
-    private string? Password => configuration["Email:Password"];
-    private string? FromAddress => configuration["Email:FromAddress"] ?? Username;
-    private string FromName => configuration["Email:FromName"] ?? "Nexo";
-    private bool EnableSsl => configuration.GetValue("Email:EnableSsl", true);
+    private string? ApiKey => configuration["Brevo:ApiKey"];
+    private string? FromAddress => configuration["Brevo:FromAddress"];
+    private string FromName => configuration["Brevo:FromName"] ?? "Nexo";
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Host)
-        && !string.IsNullOrWhiteSpace(Username)
-        && !string.IsNullOrWhiteSpace(Password)
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey)
         && !string.IsNullOrWhiteSpace(FromAddress);
 
     public async Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken)
@@ -29,30 +25,39 @@ public sealed class SmtpEmailSender(IConfiguration configuration, ILogger<SmtpEm
         if (!IsConfigured)
             throw new InvalidOperationException("El envío por correo todavía no está configurado.");
 
-        using var message = new MailMessage
+        using var request = new HttpRequestMessage(HttpMethod.Post, "v3/smtp/email");
+        request.Headers.Add("api-key", ApiKey);
+        request.Content = JsonContent.Create(new
         {
-            From = new MailAddress(FromAddress!, FromName),
-            Subject = "Código para recuperar tu contraseña de Nexo",
-            Body = $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje.",
-            IsBodyHtml = false
-        };
-        message.To.Add(email);
-
-        using var smtp = new SmtpClient(Host!, Port)
-        {
-            EnableSsl = EnableSsl,
-            Credentials = new NetworkCredential(Username, Password)
-        };
+            sender = new { name = FromName, email = FromAddress },
+            to = new[] { new { email } },
+            subject = "Código para recuperar tu contraseña de Nexo",
+            textContent = $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje."
+        });
 
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            await smtp.SendMailAsync(message);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+                return;
+
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogError(
+                "Brevo rechazó el correo de recuperación para {Email}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
+                email,
+                (int)response.StatusCode,
+                responseBody);
+            throw new InvalidOperationException("No se pudo enviar el correo de recuperación.");
         }
-        catch (SmtpException exception)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogError(exception, "El servidor SMTP rechazó el correo de recuperación para {Email}.", email);
-            throw new InvalidOperationException("No se pudo enviar el correo de recuperación.", exception);
+            logger.LogError("Brevo no respondió a tiempo al enviar el correo de recuperación para {Email}.", email);
+            throw new InvalidOperationException("El servicio de correo no respondió a tiempo.");
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogError(exception, "No se pudo conectar con Brevo para enviar el correo de recuperación a {Email}.", email);
+            throw new InvalidOperationException("No se pudo conectar con el servicio de correo.", exception);
         }
     }
 }
