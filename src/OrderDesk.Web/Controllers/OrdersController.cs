@@ -52,19 +52,28 @@ public sealed class OrdersController(AppDbContext db) : Controller
 
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
-    public async Task<IActionResult> ChangeStatus(int id, OrderStatus status, CancellationToken ct)
+    public async Task<IActionResult> ChangeStatus(int id, OrderStatus status, string? returnTo, CancellationToken ct)
     {
         var order = await db.Orders.FindAsync([id], ct);
         if (order is null) return NotFound();
         var previous = order.Status;
-        if (previous == status) { TempData["Success"] = $"El pedido {order.Number} ya estaba {StatusLabel(status)}."; return RedirectToAction("Details", "Customers", new { id = order.CustomerId }); }
+        if (previous == status)
+        {
+            TempData["Success"] = $"El pedido {order.Number} ya estaba {StatusLabel(status)}.";
+            return RedirectAfterStatusChange(returnTo, order.CustomerId);
+        }
         order.Status = status;
         order.UpdatedAtUtc = DateTime.UtcNow;
         db.OrderStatusHistories.Add(new OrderStatusHistory { OrderId = order.Id, PreviousStatus = previous, NewStatus = status, ChangedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) });
         await db.SaveChangesAsync(ct);
         TempData["Success"] = $"El pedido {order.Number} ahora está {StatusLabel(status)}.";
-        return RedirectToAction("Details", "Customers", new { id = order.CustomerId });
+        return RedirectAfterStatusChange(returnTo, order.CustomerId);
     }
+
+    private IActionResult RedirectAfterStatusChange(string? returnTo, int customerId) =>
+        string.Equals(returnTo, "orders", StringComparison.OrdinalIgnoreCase)
+            ? RedirectToAction(nameof(Index))
+            : RedirectToAction("Details", "Customers", new { id = customerId });
 
     public static string StatusLabel(OrderStatus status) => status switch
     {
