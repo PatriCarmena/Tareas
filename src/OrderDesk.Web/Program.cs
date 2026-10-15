@@ -10,8 +10,14 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews().AddJsonOptions(options =>
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddControllersWithViews(options =>
+{
+    var messages = options.ModelBindingMessageProvider;
+    messages.SetValueIsInvalidAccessor(value => $"El valor '{value}' no es válido.");
+    messages.SetValueMustBeANumberAccessor(_ => "Ingresá un número válido.");
+    messages.SetMissingBindRequiredValueAccessor(name => $"El campo {name} es obligatorio.");
+    messages.SetAttemptedValueIsInvalidAccessor((value, name) => $"El valor '{value}' no es válido para {name}.");
+}).AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 var databaseConnection = builder.Configuration.GetConnectionString("PostgreSQL")
     ?? throw new InvalidOperationException("Falta configurar la conexión PostgreSQL.");
 
@@ -40,6 +46,7 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
     options.User.RequireUniqueEmail = true;
 })
     .AddEntityFrameworkStores<AppDbContext>()
+    .AddErrorDescriber<SpanishIdentityErrorDescriber>()
     .AddDefaultTokenProviders();
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -65,11 +72,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     });
 }
 builder.Services.AddHttpClient<IWhatsAppSender, TwilioWhatsAppSender>();
-builder.Services.AddHttpClient<IEmailSender, BrevoEmailSender>(client =>
-{
-    client.BaseAddress = new Uri("https://api.brevo.com/");
-    client.Timeout = TimeSpan.FromSeconds(15);
-});
+builder.Services.AddHttpClient<IEmailSender, GmailApiEmailSender>(client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddHttpClient<IExternalCustomerService, ExternalCustomerService>(client =>
 {
     var externalBaseUrl = builder.Configuration["ExternalApi:BaseUrl"];

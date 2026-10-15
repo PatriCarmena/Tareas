@@ -64,6 +64,7 @@ Los valores reales se consultan en **Render → nexo-clientes-pedidos → Enviro
 - `SeedAdmin__Email` y `SeedAdmin__Password`: primer acceso administrativo.
 - `Webhook__Secret`: autenticación del webhook.
 - `Google__ClientId` y `Google__ClientSecret`: OAuth de Google. En Google Cloud registrar `https://nexo-clientes-pedidos.onrender.com/signin-google` como URI de redirección.
-- `Twilio__AccountSid`, `Twilio__AuthToken` y `Twilio__WhatsAppFrom`: recuperación por WhatsApp. Los usuarios deben tener teléfono en formato internacional.
+- `GmailApi__ClientId`, `GmailApi__ClientSecret` y `GmailApi__RefreshToken`: autorización OAuth 2.0 con alcance `gmail.send` para enviar códigos de recuperación mediante Gmail API.
+- `GmailApi__FromAddress`: cuenta de Gmail que concedió la autorización. `GmailApi__FromName` puede configurarse como `Nexo`.
 
 El plan gratuito de Render suspende los servicios inactivos, por lo que el primer acceso puede demorar. Evitar ese arranque en frío requiere cambiar el servicio web y, si corresponde, la API externa a un plan de pago.

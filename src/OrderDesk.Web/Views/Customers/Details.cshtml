@@ -15,9 +15,9 @@
             <article class="order-row">
                 <div><strong>@order.Number</strong><p>@order.Description</p><small>@order.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</small></div>
                 <strong class="amount">@order.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong>
-                @if (!User.IsInRole(AppRoles.Viewer)) { <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form">
+                @if (!User.IsInRole(AppRoles.Viewer)) { <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form" novalidate>
                     <input type="hidden" name="id" value="@order.Id" />
-                    <select name="status" onchange="this.form.submit()" aria-label="Estado de @order.Number">
+                    <select name="status" data-confirm-change="¿Cambiar el estado del pedido @order.Number?" data-current-value="@order.Status" aria-label="Estado de @order.Number">
                         @foreach (var status in Enum.GetValues<OrderStatus>()) { <option value="@status" selected="@(status == order.Status)">@OrdersController.StatusLabel(status)</option> }
                     </select>
                 </form> } else { <span class="status status-@order.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(order.Status)</span> }

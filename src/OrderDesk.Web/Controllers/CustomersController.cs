@@ -23,10 +23,18 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
         }
         if (status.HasValue) customers = customers.Where(x => x.Orders.Any(o => o.Status == status));
         var total = await customers.CountAsync(ct);
-        var items = await customers.OrderBy(x => x.Name).Skip((page - 1) * pageSize).Take(pageSize).Select(x => new Customer
+        var items = await customers.OrderBy(x => x.Name).Skip((page - 1) * pageSize).Take(pageSize).Select(x => new CustomerListItemVm
         {
-            Id = x.Id, Name = x.Name, Email = x.Email, Phone = x.Phone, Address = x.Address,
-            Orders = x.Orders.Where(o => !status.HasValue || o.Status == status).OrderByDescending(o => o.CreatedAtUtc).ToList()
+            Id = x.Id,
+            Name = x.Name,
+            Email = x.Email,
+            OrderCount = x.Orders.Count(o => !status.HasValue || o.Status == status),
+            ActiveTotal = x.Orders.Where(o => (!status.HasValue || o.Status == status) && o.Status != OrderStatus.Cancelled)
+                .Sum(o => (decimal?)o.Total) ?? 0,
+            LatestOrderStatus = x.Orders.Where(o => !status.HasValue || o.Status == status)
+                .OrderByDescending(o => o.CreatedAtUtc).Select(o => (OrderStatus?)o.Status).FirstOrDefault(),
+            LatestOrderTotal = x.Orders.Where(o => !status.HasValue || o.Status == status)
+                .OrderByDescending(o => o.CreatedAtUtc).Select(o => (decimal?)o.Total).FirstOrDefault()
         }).ToListAsync(ct);
         return View(new CustomerListVm(items, query, status, page, Math.Max(1, (int)Math.Ceiling(total / (double)pageSize)), total));
     }

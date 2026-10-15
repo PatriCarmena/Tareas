@@ -4,7 +4,7 @@
     <a class="back" href="@(editing ? Url.Action("Details", new { id = Model.Id }) : Url.Action("Index"))">← Volver</a>
     <div class="form-card">
         <p class="eyebrow">CLIENTE</p><h1>@(editing ? "Editar datos" : "Nuevo cliente")</h1>
-        <form asp-action="@(editing ? "Edit" : "Create")" method="post">
+        <form asp-action="@(editing ? "Edit" : "Create")" method="post" novalidate>
             <input asp-for="Id" type="hidden" />
             <div asp-validation-summary="ModelOnly" class="validation"></div>
             <div class="field"><label asp-for="Name"></label><input asp-for="Name" autofocus /><span asp-validation-for="Name"></span></div>

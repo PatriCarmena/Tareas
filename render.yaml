@@ -26,6 +26,16 @@ services:
         sync: false
       - key: Google__ClientSecret
         sync: false
+      - key: GmailApi__ClientId
+        sync: false
+      - key: GmailApi__ClientSecret
+        sync: false
+      - key: GmailApi__RefreshToken
+        sync: false
+      - key: GmailApi__FromAddress
+        sync: false
+      - key: GmailApi__FromName
+        value: Nexo
       - key: Twilio__AccountSid
         sync: false
       - key: Twilio__AuthToken

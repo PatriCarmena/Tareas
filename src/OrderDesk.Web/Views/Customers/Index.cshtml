@@ -18,8 +18,8 @@
 
 <div class="summary-grid">
     <div class="metric"><span>Clientes encontrados</span><strong>@Model.TotalItems</strong></div>
-    <div class="metric"><span>Pedidos visibles</span><strong>@Model.Customers.Sum(x => x.Orders.Count)</strong></div>
-    <div class="metric accent"><span>Valor activo visible</span><strong>@Model.Customers.Sum(x => x.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.Total)).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div>
+    <div class="metric"><span>Pedidos visibles</span><strong>@Model.Customers.Sum(x => x.OrderCount)</strong></div>
+    <div class="metric accent"><span>Valor activo visible</span><strong>@Model.Customers.Sum(x => x.ActiveTotal).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div>
 </div>
 
 @if (Model.Customers.Count == 0)
@@ -31,13 +31,12 @@ else
     <div class="customer-grid">
     @foreach (var customer in Model.Customers)
     {
-        var latest = customer.Orders.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
         <a class="customer-card" asp-action="Details" asp-route-id="@customer.Id">
             <div class="avatar">@string.Join("", customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div>
             <div class="card-main"><h2>@customer.Name</h2><p>@customer.Email</p></div>
-            <div class="order-count"><strong>@customer.Orders.Count</strong><span>pedidos</span></div>
+            <div class="order-count"><strong>@customer.OrderCount</strong><span>pedidos</span></div>
             <div class="latest">
-                @if (latest is not null) { <span class="status status-@latest.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(latest.Status)</span><strong>@latest.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong> }
+                @if (customer.LatestOrderStatus.HasValue) { <span class="status status-@customer.LatestOrderStatus.Value.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(customer.LatestOrderStatus.Value)</span><strong>@customer.LatestOrderTotal.GetValueOrDefault().ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong> }
                 else { <span class="subtle">Sin pedidos</span> }
             </div>
             <span class="arrow">→</span>

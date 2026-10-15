@@ -11,13 +11,13 @@ public sealed class Order
     public int CustomerId { get; set; }
     public Customer Customer { get; set; } = null!;
 
-    [Required, StringLength(80), Display(Name = "Número")]
+    [Required(ErrorMessage = "Ingresá el número del pedido."), StringLength(80, ErrorMessage = "El número no puede superar los 80 caracteres."), Display(Name = "Número")]
     public string Number { get; set; } = string.Empty;
 
-    [Required, StringLength(500), Display(Name = "Descripción")]
+    [Required(ErrorMessage = "Ingresá una descripción."), StringLength(500, ErrorMessage = "La descripción no puede superar los 500 caracteres."), Display(Name = "Descripción")]
     public string Description { get; set; } = string.Empty;
 
-    [Column(TypeName = "numeric(12,2)"), Range(0.01, 999999999), Display(Name = "Total")]
+    [Column(TypeName = "numeric(12,2)"), Range(0.01, 999999999, ErrorMessage = "El total debe ser mayor que cero."), Display(Name = "Total")]
     public decimal Total { get; set; }
 
     [Display(Name = "Estado")]

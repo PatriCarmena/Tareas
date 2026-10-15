@@ -1,4 +1,7 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json.Serialization;
 
 namespace OrderDesk.Web.Services;
 
@@ -8,42 +11,71 @@ public interface IEmailSender
     Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken);
 }
 
-public sealed class BrevoEmailSender(
+public sealed class GmailApiEmailSender(
     HttpClient httpClient,
     IConfiguration configuration,
-    ILogger<BrevoEmailSender> logger) : IEmailSender
+    ILogger<GmailApiEmailSender> logger) : IEmailSender
 {
-    private string? ApiKey => configuration["Brevo:ApiKey"];
-    private string? FromAddress => configuration["Brevo:FromAddress"];
-    private string FromName => configuration["Brevo:FromName"] ?? "Nexo";
+    private string? ClientId => configuration["GmailApi:ClientId"];
+    private string? ClientSecret => configuration["GmailApi:ClientSecret"];
+    private string? RefreshToken => configuration["GmailApi:RefreshToken"];
+    private string? FromAddress => configuration["GmailApi:FromAddress"];
+    private string FromName => configuration["GmailApi:FromName"] ?? "Nexo";
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey)
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId)
+        && !string.IsNullOrWhiteSpace(ClientSecret)
+        && !string.IsNullOrWhiteSpace(RefreshToken)
         && !string.IsNullOrWhiteSpace(FromAddress);
 
     public async Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken)
     {
         if (!IsConfigured)
-            throw new InvalidOperationException("El envío por correo todavía no está configurado.");
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, "v3/smtp/email");
-        request.Headers.Add("api-key", ApiKey);
-        request.Content = JsonContent.Create(new
-        {
-            sender = new { name = FromName, email = FromAddress },
-            to = new[] { new { email } },
-            subject = "Código para recuperar tu contraseña de Nexo",
-            textContent = $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje."
-        });
+            throw new InvalidOperationException("El envío por Gmail todavía no está configurado.");
 
         try
         {
+            using var tokenResponse = await httpClient.PostAsync(
+                "https://oauth2.googleapis.com/token",
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["client_id"] = ClientId!,
+                    ["client_secret"] = ClientSecret!,
+                    ["refresh_token"] = RefreshToken!,
+                    ["grant_type"] = "refresh_token"
+                }),
+                cancellationToken);
+
+            if (!tokenResponse.IsSuccessStatusCode)
+            {
+                logger.LogError("Google rechazó la renovación de autorización. Estado: {StatusCode}.", (int)tokenResponse.StatusCode);
+                throw new InvalidOperationException("No se pudo autorizar el envío por Gmail.");
+            }
+
+            var token = await tokenResponse.Content.ReadFromJsonAsync<GoogleTokenResponse>(cancellationToken: cancellationToken);
+            if (string.IsNullOrWhiteSpace(token?.AccessToken))
+                throw new InvalidOperationException("Google no devolvió una autorización válida.");
+
+            var message = string.Join("\r\n",
+                $"From: {EncodeHeader(FromName)} <{FromAddress}>",
+                $"To: {email}",
+                $"Subject: {EncodeHeader("Código para recuperar tu contraseña de Nexo")}",
+                "MIME-Version: 1.0",
+                "Content-Type: text/plain; charset=UTF-8",
+                "Content-Transfer-Encoding: base64",
+                "",
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(
+                    $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje.")));
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            request.Content = JsonContent.Create(new { raw = ToBase64Url(message) });
             using var response = await httpClient.SendAsync(request, cancellationToken);
             if (response.IsSuccessStatusCode)
                 return;
 
             var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogError(
-                "Brevo rechazó el correo de recuperación para {Email}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
+                "Gmail API rechazó el correo de recuperación para {Email}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
                 email,
                 (int)response.StatusCode,
                 responseBody);
@@ -51,13 +83,26 @@ public sealed class BrevoEmailSender(
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogError("Brevo no respondió a tiempo al enviar el correo de recuperación para {Email}.", email);
+            logger.LogError("Gmail API no respondió a tiempo al enviar el correo de recuperación para {Email}.", email);
             throw new InvalidOperationException("El servicio de correo no respondió a tiempo.");
         }
         catch (HttpRequestException exception)
         {
-            logger.LogError(exception, "No se pudo conectar con Brevo para enviar el correo de recuperación a {Email}.", email);
+            logger.LogError(exception, "No se pudo conectar con Gmail API para enviar el correo de recuperación a {Email}.", email);
             throw new InvalidOperationException("No se pudo conectar con el servicio de correo.", exception);
         }
+    }
+
+    private static string EncodeHeader(string value) => $"=?UTF-8?B?{Convert.ToBase64String(Encoding.UTF8.GetBytes(value))}?=";
+
+    private static string ToBase64Url(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+
+    private sealed class GoogleTokenResponse
+    {
+        [JsonPropertyName("access_token")]
+        public string? AccessToken { get; init; }
     }
 }

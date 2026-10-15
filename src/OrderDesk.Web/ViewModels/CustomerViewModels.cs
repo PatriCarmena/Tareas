@@ -3,7 +3,18 @@ using OrderDesk.Web.Services;
 
 namespace OrderDesk.Web.ViewModels;
 
-public sealed record CustomerListVm(IReadOnlyList<Customer> Customers, string? Query, OrderStatus? Status, int Page, int TotalPages, int TotalItems);
+public sealed class CustomerListItemVm
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
+    public int OrderCount { get; init; }
+    public decimal ActiveTotal { get; init; }
+    public OrderStatus? LatestOrderStatus { get; init; }
+    public decimal? LatestOrderTotal { get; init; }
+}
+
+public sealed record CustomerListVm(IReadOnlyList<CustomerListItemVm> Customers, string? Query, OrderStatus? Status, int Page, int TotalPages, int TotalItems);
 public sealed record CustomerDetailVm(Customer Customer, CustomerInsight? Insight);
 public sealed record OrderListVm(IReadOnlyList<Order> Orders, string? Query, OrderStatus? Status, int Page, int TotalPages, int TotalItems);
 public sealed record DashboardStatusVm(OrderStatus Status, int Count, decimal Total);
