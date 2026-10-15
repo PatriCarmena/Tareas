@@ -5,6 +5,8 @@ using OrderDesk.Web.Models;
 using OrderDesk.Web.Services;
 using OrderDesk.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Security.Claims;
 
 namespace OrderDesk.Web.Controllers;
 
@@ -40,13 +42,18 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
     }
 
     [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
-    public IActionResult Create() => View("Form", new Customer());
+    public async Task<IActionResult> Create(CancellationToken ct)
+    {
+        await LoadAssignees(null, ct);
+        return View("Form", new Customer());
+    }
 
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public async Task<IActionResult> Create(Customer customer, CancellationToken ct)
     {
-        if (!ModelState.IsValid) return View("Form", customer);
+        if (customer.AssignedUserId is not null && !await db.Users.AnyAsync(x => x.Id == customer.AssignedUserId, ct)) ModelState.AddModelError(nameof(customer.AssignedUserId), "El responsable seleccionado no existe.");
+        if (!ModelState.IsValid) { await LoadAssignees(customer.AssignedUserId, ct); return View("Form", customer); }
         db.Customers.Add(customer);
         await db.SaveChangesAsync(ct);
         TempData["Success"] = "Cliente creado correctamente.";
@@ -57,7 +64,9 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
     public async Task<IActionResult> Edit(int id, CancellationToken ct)
     {
         var customer = await db.Customers.FindAsync([id], ct);
-        return customer is null ? NotFound() : View("Form", customer);
+        if (customer is null) return NotFound();
+        await LoadAssignees(customer.AssignedUserId, ct);
+        return View("Form", customer);
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -65,10 +74,13 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
     public async Task<IActionResult> Edit(int id, Customer input, CancellationToken ct)
     {
         if (id != input.Id) return BadRequest();
-        if (!ModelState.IsValid) return View("Form", input);
+        if (input.AssignedUserId is not null && !await db.Users.AnyAsync(x => x.Id == input.AssignedUserId, ct)) ModelState.AddModelError(nameof(input.AssignedUserId), "El responsable seleccionado no existe.");
+        if (!ModelState.IsValid) { await LoadAssignees(input.AssignedUserId, ct); return View("Form", input); }
         var customer = await db.Customers.FindAsync([id], ct);
         if (customer is null) return NotFound();
         customer.Name = input.Name; customer.Email = input.Email; customer.Phone = input.Phone; customer.Address = input.Address;
+        customer.Company = input.Company; customer.Position = input.Position; customer.AdditionalInfo = input.AdditionalInfo;
+        customer.Tags = input.Tags; customer.AssignedUserId = input.AssignedUserId;
         await db.SaveChangesAsync(ct);
         TempData["Success"] = "Cambios guardados.";
         return RedirectToAction(nameof(Details), new { id });
@@ -77,13 +89,38 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
         var customer = await db.Customers
+            .Include(x => x.AssignedUser)
+            .Include(x => x.Notes.OrderByDescending(n => n.CreatedAtUtc)).ThenInclude(n => n.CreatedByUser)
             .Include(x => x.Orders.OrderByDescending(o => o.CreatedAtUtc))
-            .ThenInclude(o => o.StatusHistory.OrderByDescending(h => h.ChangedAtUtc))
+            .ThenInclude(o => o.StatusHistory.OrderByDescending(h => h.ChangedAtUtc)).ThenInclude(h => h.ChangedByUser)
             .AsSplitQuery()
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == id, ct);
         if (customer is null) return NotFound();
-        return View(new CustomerDetailVm(customer, null));
+        var timeline = customer.Notes.Select(n => new CustomerTimelineItemVm(n.CreatedAtUtc, "note", "Nota interna", n.Content, n.CreatedByUser?.FullName))
+            .Concat(customer.Orders.Select(o => new CustomerTimelineItemVm(o.CreatedAtUtc, "order", $"Pedido {o.Number}", $"{o.Description} · {o.Total:C0}")))
+            .Concat(customer.Orders.SelectMany(o => o.StatusHistory.Select(h => new CustomerTimelineItemVm(h.ChangedAtUtc, "status", $"Estado de {o.Number}", $"{(h.PreviousStatus.HasValue ? OrdersController.StatusLabel(h.PreviousStatus.Value) + " → " : "")} {OrdersController.StatusLabel(h.NewStatus)}", h.ChangedByUser?.FullName ?? h.Source))))
+            .OrderByDescending(x => x.OccurredAtUtc).ToList();
+        return View(new CustomerDetailVm(customer, timeline));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
+    public async Task<IActionResult> AddNote(int id, string content, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(content) || content.Trim().Length > 2000)
+        {
+            TempData["Error"] = "La nota debe tener entre 1 y 2000 caracteres.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        var customer = await db.Customers.FindAsync([id], ct);
+        if (customer is null) return NotFound();
+        var now = DateTime.UtcNow;
+        db.CustomerNotes.Add(new CustomerNote { CustomerId = id, Content = content.Trim(), CreatedAtUtc = now, CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) });
+        customer.LastContactAtUtc = now;
+        await db.SaveChangesAsync(ct);
+        TempData["Success"] = "Nota agregada al historial.";
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     [HttpGet]
@@ -94,5 +131,11 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
         return insight is null
             ? StatusCode(StatusCodes.Status503ServiceUnavailable)
             : Ok(insight);
+    }
+
+    private async Task LoadAssignees(string? selected, CancellationToken ct)
+    {
+        var users = await db.Users.AsNoTracking().OrderBy(x => x.FullName).ToListAsync(ct);
+        ViewBag.Assignees = new SelectList(users, nameof(AppUser.Id), nameof(AppUser.FullName), selected);
     }
 }

@@ -11,6 +11,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<WebhookReceipt> WebhookReceipts => Set<WebhookReceipt>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
+    public DbSet<CustomerNote> CustomerNotes => Set<CustomerNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,5 +24,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         modelBuilder.Entity<OrderStatusHistory>().Property(x => x.NewStatus).HasConversion<string>();
         modelBuilder.Entity<OrderStatusHistory>().HasIndex(x => new { x.OrderId, x.ChangedAtUtc });
         modelBuilder.Entity<PasswordResetCode>().HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
+        modelBuilder.Entity<Customer>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<CustomerNote>().HasIndex(x => new { x.CustomerId, x.CreatedAtUtc });
+        modelBuilder.Entity<CustomerNote>().HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }

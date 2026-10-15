@@ -18,6 +18,25 @@ public sealed class Customer
     [StringLength(200, ErrorMessage = "La dirección no puede superar los 200 caracteres."), Display(Name = "Dirección")]
     public string? Address { get; set; }
 
+    [StringLength(160), Display(Name = "Empresa")]
+    public string? Company { get; set; }
+
+    [StringLength(120), Display(Name = "Cargo")]
+    public string? Position { get; set; }
+
+    [StringLength(500), Display(Name = "Datos adicionales")]
+    public string? AdditionalInfo { get; set; }
+
+    [StringLength(250), Display(Name = "Etiquetas")]
+    public string? Tags { get; set; }
+
+    [Display(Name = "Responsable")]
+    public string? AssignedUserId { get; set; }
+    public AppUser? AssignedUser { get; set; }
+
+    public DateTime? LastContactAtUtc { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public List<Order> Orders { get; set; } = [];
+    public List<CustomerNote> Notes { get; set; } = [];
 }

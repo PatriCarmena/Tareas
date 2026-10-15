@@ -1,66 +1,32 @@
 @model CustomerDetailVm
-@{ ViewData["Title"] = Model.Customer.Name; }
+@{ ViewData["Title"] = Model.Customer.Name; var canEdit = !User.IsInRole(AppRoles.Viewer); }
 <a class="back" asp-action="Index">← Todos los clientes</a>
-<section class="detail-header">
-    <div class="identity"><div class="avatar avatar-large">@string.Join("", Model.Customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div><div><p class="eyebrow">CLIENTE #@Model.Customer.Id.ToString("D4")</p><h1>@Model.Customer.Name</h1><p>@Model.Customer.Email · @(Model.Customer.Phone ?? "Sin teléfono")</p></div></div>
-    @if (!User.IsInRole(AppRoles.Viewer)) { <div class="actions"><a class="button button-secondary" asp-action="Edit" asp-route-id="@Model.Customer.Id">Editar</a><a class="button" asp-controller="Orders" asp-action="Create" asp-route-customerId="@Model.Customer.Id">+ Nuevo pedido</a></div> }
+<section class="crm-header">
+    <div class="identity"><div class="avatar avatar-large">@string.Join("", Model.Customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0]))</div><div><p class="eyebrow">CLIENTE #@Model.Customer.Id.ToString("D4")</p><h1>@Model.Customer.Name</h1><p>@(Model.Customer.Position ?? "Contacto")@(string.IsNullOrWhiteSpace(Model.Customer.Company) ? "" : $" · {Model.Customer.Company}")</p></div></div>
+    @if (canEdit) { <div class="actions"><a class="button button-secondary" asp-action="Edit" asp-route-id="@Model.Customer.Id">Editar ficha</a><a class="button" asp-controller="Orders" asp-action="Create" asp-route-customerId="@Model.Customer.Id">+ Nuevo pedido</a></div> }
 </section>
+@if (!string.IsNullOrWhiteSpace(Model.Customer.Tags)) { <div class="crm-tags">@foreach (var tag in Model.Customer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <span>@tag</span> }</div> }
 
-<div class="detail-grid">
-    <section class="panel orders-panel">
-        <div class="panel-title"><div><p class="eyebrow">ACTIVIDAD</p><h2>Pedidos</h2></div><span class="counter">@Model.Customer.Orders.Count</span></div>
-        @if (Model.Customer.Orders.Count == 0) { <div class="empty compact"><h3>Todavía no hay pedidos</h3><p>Creá el primero para empezar el seguimiento.</p></div> }
-        @foreach (var order in Model.Customer.Orders)
-        {
-            <article class="order-row">
-                <div><strong>@order.Number</strong><p>@order.Description</p><small>@order.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</small></div>
-                <strong class="amount">@order.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong>
-                @if (!User.IsInRole(AppRoles.Viewer)) { <form asp-controller="Orders" asp-action="ChangeStatus" method="post" class="status-form" novalidate>
-                    <input type="hidden" name="id" value="@order.Id" />
-                    <select name="status" data-confirm-change="¿Cambiar el estado del pedido @order.Number?" data-current-value="@order.Status" aria-label="Estado de @order.Number">
-                        @foreach (var status in Enum.GetValues<OrderStatus>()) { <option value="@status" selected="@(status == order.Status)">@OrdersController.StatusLabel(status)</option> }
-                    </select>
-                </form> } else { <span class="status status-@order.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(order.Status)</span> }
-                @if (order.StatusHistory.Count > 0) { <details class="history"><summary>Historial (@order.StatusHistory.Count)</summary>@foreach (var change in order.StatusHistory) { <div><small>@change.ChangedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · @change.Source</small><span>@(change.PreviousStatus.HasValue ? OrdersController.StatusLabel(change.PreviousStatus.Value) + " → " : "")@OrdersController.StatusLabel(change.NewStatus)</span></div> }</details> }
-            </article>
-        }
-    </section>
-    <aside>
-        <section class="panel insight">
-            <div class="panel-title"><div><p class="eyebrow">FUENTE EXTERNA</p><h2>Perfil comercial</h2></div><span class="live-dot" title="Consultado en tiempo real"></span></div>
-            <div id="customer-insight" data-url="@Url.Action("Insight", new { id = Model.Customer.Id })" aria-live="polite">
-                <div class="api-offline"><strong>Consultando datos…</strong><p>Podés seguir usando Nexo mientras carga la fuente externa.</p></div>
-            </div>
+<div class="crm-columns">
+    <aside class="crm-sidebar"><section class="panel crm-properties"><div class="panel-title"><div><p class="eyebrow">PROPIEDADES</p><h2>Acerca del cliente</h2></div></div><dl>
+        <div><dt>Email</dt><dd><a href="mailto:@Model.Customer.Email">@Model.Customer.Email</a></dd></div><div><dt>Teléfono</dt><dd>@(Model.Customer.Phone ?? "—")</dd></div><div><dt>Empresa</dt><dd>@(Model.Customer.Company ?? "—")</dd></div><div><dt>Cargo</dt><dd>@(Model.Customer.Position ?? "—")</dd></div><div><dt>Dirección</dt><dd>@(Model.Customer.Address ?? "—")</dd></div><div><dt>Responsable</dt><dd>@(Model.Customer.AssignedUser?.FullName ?? "Sin asignar")</dd></div><div><dt>Último contacto</dt><dd>@(Model.Customer.LastContactAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Sin contactos")</dd></div><div><dt>Creado</dt><dd>@Model.Customer.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy")</dd></div>
+    </dl>@if (!string.IsNullOrWhiteSpace(Model.Customer.AdditionalInfo)) { <div class="additional-info"><small>DATOS ADICIONALES</small><p>@Model.Customer.AdditionalInfo</p></div> }</section></aside>
+
+    <main class="crm-activity">
+        @if (canEdit) { <section class="panel note-composer"><p class="eyebrow">NUEVA ACTIVIDAD</p><h2>Agregar nota interna</h2><form asp-action="AddNote" method="post"><input type="hidden" name="id" value="@Model.Customer.Id" /><textarea name="content" maxlength="2000" rows="3" placeholder="Escribí una observación, llamada o seguimiento…" required></textarea><div class="note-actions"><small>Se registrará con tu usuario y la fecha actual.</small><button class="button button-small" type="submit">Guardar nota</button></div></form></section> }
+        <section class="panel timeline-panel"><div class="panel-title"><div><p class="eyebrow">HISTORIAL</p><h2>Línea de tiempo</h2></div><span class="counter">@Model.Timeline.Count</span></div>
+            @if (Model.Timeline.Count == 0) { <div class="empty compact"><h3>Sin actividad todavía</h3><p>Las notas y novedades aparecerán aquí.</p></div> }
+            <div class="crm-timeline">@foreach (var item in Model.Timeline) { <article class="timeline-item timeline-@item.Type"><span class="timeline-icon">@(item.Type == "note" ? "✎" : item.Type == "order" ? "#" : "↻")</span><div><div class="timeline-heading"><strong>@item.Title</strong><time>@item.OccurredAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</time></div><p>@item.Description</p>@if (!string.IsNullOrWhiteSpace(item.Author)) { <small>Por @item.Author</small> }</div></article> }</div>
         </section>
-        <section class="panel contact"><p class="eyebrow">CONTACTO</p><dl><div><dt>Email</dt><dd>@Model.Customer.Email</dd></div><div><dt>Teléfono</dt><dd>@(Model.Customer.Phone ?? "—")</dd></div><div><dt>Dirección</dt><dd>@(Model.Customer.Address ?? "—")</dd></div></dl></section>
+    </main>
+
+    <aside class="crm-sidebar">
+        <section class="panel crm-summary"><p class="eyebrow">RESUMEN COMERCIAL</p><div class="crm-kpi"><strong>@Model.Customer.Orders.Count</strong><span>pedidos</span></div><div class="crm-kpi"><strong>@Model.Customer.Orders.Where(x => x.Status != OrderStatus.Cancelled).Sum(x => x.Total).ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong><span>valor activo</span></div></section>
+        <section class="panel compact-orders"><div class="panel-title"><div><p class="eyebrow">PEDIDOS</p><h2>Operaciones</h2></div></div>@foreach (var order in Model.Customer.Orders.Take(5)) { <div class="compact-order"><div><strong>@order.Number</strong><small>@order.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</small></div><span class="status status-@order.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(order.Status)</span></div> }@if (Model.Customer.Orders.Count == 0) { <p class="subtle">Todavía no hay pedidos.</p> }</section>
+        <section class="panel insight"><div class="panel-title"><div><p class="eyebrow">FUENTE EXTERNA</p><h2>Perfil comercial</h2></div><span class="live-dot"></span></div><div id="customer-insight" data-url="@Url.Action("Insight", new { id = Model.Customer.Id })" aria-live="polite"><div class="api-offline"><strong>Consultando datos…</strong><p>La ficha ya está disponible.</p></div></div></section>
     </aside>
 </div>
 
-@section Scripts {
-<script>
-(() => {
-    const container = document.getElementById('customer-insight');
-    if (!container) return;
-
-    const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    })[char]);
-
-    fetch(container.dataset.url, { headers: { 'Accept': 'application/json' } })
-        .then(response => {
-            if (!response.ok) throw new Error('Fuente externa no disponible');
-            return response.json();
-        })
-        .then(insight => {
-            const checkedAt = new Date(insight.checkedAtUtc).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-            container.innerHTML = `<div class="score"><strong>${escapeHtml(insight.riskScore)}</strong><span>/ 100</span></div>
-                <dl><div><dt>Segmento</dt><dd>${escapeHtml(insight.segment)}</dd></div>
-                <div><dt>Recomendación</dt><dd>${escapeHtml(insight.recommendation)}</dd></div></dl>
-                <small>Actualizado ${escapeHtml(checkedAt)}</small>`;
-        })
-        .catch(() => {
-            container.innerHTML = '<div class="api-offline"><strong>Datos no disponibles</strong><p>La gestión local continúa funcionando.</p></div>';
-        });
-})();
-</script>
-}
+@section Scripts { <script>
+(()=>{const b=document.getElementById('customer-insight');if(!b)return;const s=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));fetch(b.dataset.url,{headers:{Accept:'application/json'}}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(x=>{b.innerHTML=`<div class="score"><strong>${s(x.riskScore)}</strong><span>/ 100</span></div><dl><div><dt>Segmento</dt><dd>${s(x.segment)}</dd></div><div><dt>Recomendación</dt><dd>${s(x.recommendation)}</dd></div></dl>`}).catch(()=>{b.innerHTML='<div class="api-offline"><strong>Datos no disponibles</strong><p>La gestión local continúa funcionando.</p></div>'})})();
+</script> }
