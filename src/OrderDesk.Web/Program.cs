@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -37,7 +38,14 @@ if (Uri.TryCreate(databaseConnection, UriKind.Absolute, out var databaseUri)
     }.ConnectionString;
 }
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(databaseConnection));
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    options.UseNpgsql(databaseConnection);
+    // Las migraciones se versionan explícitamente en el repositorio. Evita que
+    // una diferencia del snapshot impida aplicar una migración válida al iniciar.
+    options.ConfigureWarnings(warnings =>
+        warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 {
     options.Password.RequiredLength = 8;
