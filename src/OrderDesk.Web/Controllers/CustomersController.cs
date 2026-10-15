@@ -76,9 +76,23 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
 
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
-        var customer = await db.Customers.Include(x => x.Orders.OrderByDescending(o => o.CreatedAtUtc)).ThenInclude(o => o.StatusHistory.OrderByDescending(h => h.ChangedAtUtc)).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        var customer = await db.Customers
+            .Include(x => x.Orders.OrderByDescending(o => o.CreatedAtUtc))
+            .ThenInclude(o => o.StatusHistory.OrderByDescending(h => h.ChangedAtUtc))
+            .AsSplitQuery()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == id, ct);
         if (customer is null) return NotFound();
+        return View(new CustomerDetailVm(customer, null));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Insight(int id, CancellationToken ct)
+    {
+        if (!await db.Customers.AsNoTracking().AnyAsync(x => x.Id == id, ct)) return NotFound();
         var insight = await external.GetInsightAsync(id, ct);
-        return View(new CustomerDetailVm(customer, insight));
+        return insight is null
+            ? StatusCode(StatusCodes.Status503ServiceUnavailable)
+            : Ok(insight);
     }
 }
