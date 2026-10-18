@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
     public DbSet<CustomerNote> CustomerNotes => Set<CustomerNote>();
     public DbSet<CustomerActivity> CustomerActivities => Set<CustomerActivity>();
+    public DbSet<Opportunity> Opportunities => Set<Opportunity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,5 +36,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         modelBuilder.Entity<CustomerActivity>().HasIndex(x => new { x.CustomerId, x.ScheduledAtUtc });
         modelBuilder.Entity<CustomerActivity>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<CustomerActivity>().HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Opportunity>().Property(x => x.Stage).HasConversion<string>();
+        modelBuilder.Entity<Opportunity>().Property(x => x.EstimatedAmount).HasPrecision(12, 2);
+        modelBuilder.Entity<Opportunity>().HasIndex(x => new { x.Stage, x.ExpectedCloseDate });
+        modelBuilder.Entity<Opportunity>().HasIndex(x => x.CustomerId);
+        modelBuilder.Entity<Opportunity>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }

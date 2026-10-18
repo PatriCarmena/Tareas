@@ -40,4 +40,5 @@ public sealed class Customer
     public List<Order> Orders { get; set; } = [];
     public List<CustomerNote> Notes { get; set; } = [];
     public List<CustomerActivity> Activities { get; set; } = [];
+    public List<Opportunity> Opportunities { get; set; } = [];
 }

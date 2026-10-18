@@ -1,0 +1,27 @@
+@model OpportunityBoardVm
+@using System.Globalization
+@{ ViewData["Title"] = "Oportunidades"; var canEdit = User.IsInRole(AppRoles.Administrator) || User.IsInRole(AppRoles.Operator); var money = new CultureInfo("es-AR"); }
+<section class="page-heading"><div><p class="eyebrow">VENTAS · ETAPA 3</p><h1>Oportunidades comerciales</h1><p class="subtle">Seguí cada posible venta desde el primer contacto hasta el cierre.</p></div></section>
+<form method="get" class="opportunity-filters"><label class="search"><span aria-hidden="true">⌕</span><input name="query" value="@Model.Query" placeholder="Buscar oportunidad o cliente" aria-label="Buscar oportunidad o cliente" /></label><select name="assignedUserId" aria-label="Responsable"><option value="">Todos los responsables</option>@foreach (var user in Model.Assignees) { <option value="@user.Id" selected="@(Model.AssignedUserId == user.Id)">@user.FullName</option> }</select><button class="button button-secondary" type="submit">Filtrar</button><a class="text-link" asp-action="Index">Limpiar</a></form>
+@if (Model.Opportunities.Count == 0) { <div class="empty compact"><h2>No hay oportunidades con estos filtros</h2><p>Para crear una, abrí la ficha de un cliente.</p><a class="button" asp-controller="Customers" asp-action="Index">Ver clientes</a></div> }
+<div class="kanban-board" aria-label="Tablero de oportunidades">
+@foreach (var stage in Enum.GetValues<OpportunityStage>()) {
+    var cards = Model.Opportunities.Where(x => x.Stage == stage).ToList();
+    <section class="kanban-column stage-@stage.ToString().ToLowerInvariant()" data-stage="@stage" aria-label="@OpportunitiesController.StageLabel(stage)">
+        <header class="kanban-column-header"><div><h2>@OpportunitiesController.StageLabel(stage)</h2><span>@cards.Count</span></div><strong>@cards.Sum(x => x.EstimatedAmount).ToString("C0", money)</strong></header>
+        <div class="kanban-cards">
+        @foreach (var opportunity in cards) {
+            <article class="opportunity-card" data-opportunity-id="@opportunity.Id" draggable="@(canEdit ? "true" : "false")">
+                <div class="opportunity-card-top"><strong>@opportunity.Name</strong>@if (canEdit) { <a class="text-link" asp-action="Edit" asp-route-id="@opportunity.Id" aria-label="Editar @opportunity.Name">Editar</a> }</div>
+                <a class="opportunity-customer" asp-controller="Customers" asp-action="Details" asp-route-id="@opportunity.CustomerId">@opportunity.Customer.Name</a>
+                <div class="opportunity-amount">@opportunity.EstimatedAmount.ToString("C0", money)</div>
+                <div class="opportunity-details"><span>@opportunity.Probability% de probabilidad</span><span>Cierre @opportunity.ExpectedCloseDate.ToString("dd/MM/yyyy")</span><span>@(opportunity.AssignedUser?.FullName ?? "Sin asignar")</span></div>
+                @if (canEdit) { <form class="opportunity-stage-form" asp-action="ChangeStage" asp-route-id="@opportunity.Id" method="post"><label class="sr-only" for="stage-@opportunity.Id">Mover @opportunity.Name a</label><select id="stage-@opportunity.Id" name="stage">@foreach (var option in Enum.GetValues<OpportunityStage>()) { <option value="@option" selected="@(option == opportunity.Stage)">@OpportunitiesController.StageLabel(option)</option> }</select><button class="button button-small button-secondary" type="submit">Mover</button></form> }
+            </article>
+        }
+        </div>
+    </section>
+}
+</div>
+@if (canEdit) { <p class="subtle kanban-hint">Podés arrastrar las tarjetas entre columnas o usar el selector «Mover».</p> }
+@section Scripts { @if (canEdit) { <script src="~/js/opportunities.js" asp-append-version="true"></script> } }

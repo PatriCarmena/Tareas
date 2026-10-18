@@ -37,6 +37,10 @@ dotnet run --project src/OrderDesk.Web --urls http://localhost:5080
 
 La conexión y las URL se configuran en `src/OrderDesk.Web/appsettings.json` o mediante variables de entorno.
 
+## CRM: oportunidades comerciales
+
+Desde la ficha de un cliente, un administrador u operador puede crear una oportunidad con nombre, importe estimado, probabilidad, fecha de cierre, responsable y etapa. El menú **Oportunidades** muestra un tablero Kanban con las etapas Prospecto, Contactado, Propuesta, Negociación, Ganada y Perdida. Se puede buscar por oportunidad o cliente, filtrar por responsable y cambiar la etapa arrastrando una tarjeta o usando su selector **Mover**. Los usuarios de consulta pueden ver el tablero, pero no modificarlo. Una oportunidad ganada no crea automáticamente un pedido: el pedido se registra por separado desde la ficha del cliente.
+
 ## Webhook de pedidos
 
 Endpoint: `POST /api/webhooks/orders`

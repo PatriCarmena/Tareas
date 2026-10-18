@@ -259,6 +259,26 @@ namespace OrderDesk.Web.Data.Migrations
                     b.ToTable("CustomerNotes");
                 });
 
+            modelBuilder.Entity("OrderDesk.Web.Models.Opportunity", b =>
+                {
+                    b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("AssignedUserId").HasColumnType("text");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<int>("CustomerId").HasColumnType("integer");
+                    b.Property<decimal>("EstimatedAmount").HasColumnType("numeric(12,2)");
+                    b.Property<DateOnly>("ExpectedCloseDate").HasColumnType("date");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<int>("Probability").HasColumnType("integer");
+                    b.Property<string>("Stage").IsRequired().HasColumnType("text");
+                    b.Property<DateTime>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.HasKey("Id");
+                    b.HasIndex("AssignedUserId");
+                    b.HasIndex("CustomerId");
+                    b.HasIndex("Stage", "ExpectedCloseDate");
+                    b.ToTable("Opportunities");
+                });
+
             modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -327,6 +347,16 @@ namespace OrderDesk.Web.Data.Migrations
                     b.HasOne("OrderDesk.Web.Models.Customer", "Customer").WithMany("Notes")
                         .HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Cascade).IsRequired();
                     b.Navigation("CreatedByUser");
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.Opportunity", b =>
+                {
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "AssignedUser").WithMany()
+                        .HasForeignKey("AssignedUserId").OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("OrderDesk.Web.Models.Customer", "Customer").WithMany("Opportunities")
+                        .HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                    b.Navigation("AssignedUser");
                     b.Navigation("Customer");
                 });
 
@@ -584,6 +614,7 @@ namespace OrderDesk.Web.Data.Migrations
                 {
                     b.Navigation("Activities");
                     b.Navigation("Notes");
+                    b.Navigation("Opportunities");
                     b.Navigation("Orders");
                 });
 

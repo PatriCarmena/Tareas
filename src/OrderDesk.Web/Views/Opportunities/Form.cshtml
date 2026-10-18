@@ -1,0 +1,13 @@
+@model OpportunityFormVm
+@{ var editing = Model.Id > 0; ViewData["Title"] = editing ? "Editar oportunidad" : "Nueva oportunidad"; }
+<div class="narrow"><a class="back" asp-controller="Customers" asp-action="Details" asp-route-id="@Model.CustomerId">← Volver a @ViewBag.CustomerName</a><div class="form-card">
+    <p class="eyebrow">OPORTUNIDAD · @ViewBag.CustomerName</p><h1>@(editing ? "Editar oportunidad" : "Nueva oportunidad")</h1>
+    <form asp-action="@(editing ? "Edit" : "Create")" asp-route-id="@(editing ? Model.Id.ToString() : null)" method="post">
+        <input asp-for="Id" type="hidden" /><input asp-for="CustomerId" type="hidden" /><div asp-validation-summary="ModelOnly" class="validation"></div>
+        <div class="field"><label asp-for="Name">Nombre de la oportunidad</label><input asp-for="Name" maxlength="160" placeholder="Ej.: Renovación anual" /><span asp-validation-for="Name"></span></div>
+        <div class="field-row"><div class="field"><label asp-for="EstimatedAmount">Importe estimado</label><input asp-for="EstimatedAmount" type="number" min="0" max="9999999999.99" step="0.01" /><span asp-validation-for="EstimatedAmount"></span></div><div class="field"><label asp-for="Probability">Probabilidad de venta (%)</label><input asp-for="Probability" type="number" min="0" max="100" /><span asp-validation-for="Probability"></span></div></div>
+        <div class="field-row"><div class="field"><label asp-for="ExpectedCloseDate">Fecha estimada de cierre</label><input asp-for="ExpectedCloseDate" type="date" /><span asp-validation-for="ExpectedCloseDate"></span></div><div class="field"><label asp-for="AssignedUserId">Responsable</label><select asp-for="AssignedUserId" asp-items="ViewBag.Assignees"><option value="">Seleccioná una persona</option></select><span asp-validation-for="AssignedUserId"></span></div></div>
+        <div class="field"><label asp-for="Stage">Etapa comercial</label><select asp-for="Stage">@foreach (var stage in Enum.GetValues<OpportunityStage>()) { <option value="@stage">@OpportunitiesController.StageLabel(stage)</option> }</select><span asp-validation-for="Stage"></span></div>
+        <div class="form-actions"><a class="button button-secondary" asp-controller="Customers" asp-action="Details" asp-route-id="@Model.CustomerId">Cancelar</a><button class="button" type="submit">@(editing ? "Guardar cambios" : "Crear oportunidad")</button></div>
+    </form>
+</div></div>
