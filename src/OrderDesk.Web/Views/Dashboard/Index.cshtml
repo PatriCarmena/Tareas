@@ -1,5 +1,14 @@
 @model DashboardVm
 @{ ViewData["Title"] = "Dashboard"; }
-<section class="page-heading"><div><p class="eyebrow">RESUMEN</p><h1>Dashboard</h1><p class="subtle">Los pedidos cancelados están excluidos de todas las métricas.</p></div></section>
+<section class="page-heading"><div><p class="eyebrow">RESUMEN</p><h1>Dashboard</h1><p class="subtle">Los pedidos cancelados están excluidos de las métricas comerciales.</p></div></section>
 <div class="summary-grid"><div class="metric"><span>Clientes</span><strong>@Model.CustomerCount</strong></div><div class="metric"><span>Pedidos activos</span><strong>@Model.OrderCount</strong></div><div class="metric accent"><span>Monto activo</span><strong>@Model.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div></div>
 <div class="dashboard-grid">@foreach (var row in Model.ByStatus) { <article class="panel"><span class="status status-@row.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(row.Status)</span><strong class="dashboard-number">@row.Count</strong><p>@row.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</p></article> }</div>
+<section class="activity-dashboard" aria-labelledby="activity-reminders-heading">
+    <div class="panel activity-reminders"><div class="panel-title"><div><p class="eyebrow">SEGUIMIENTO</p><h2 id="activity-reminders-heading">Recordatorios</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index">Ver actividades</a></div>
+        <div class="reminder-grid"><a asp-controller="Activities" asp-action="Index" asp-route-status="today"><strong>@Model.DueTodayCount</strong><span>programadas para hoy</span></a><a class="reminder-overdue" asp-controller="Activities" asp-action="Index" asp-route-status="overdue"><strong>@Model.OverdueCount</strong><span>vencidas</span></a></div>
+    </div>
+    <div class="panel"><div class="panel-title"><div><p class="eyebrow">AGENDA PERSONAL</p><h2>Mis tareas de hoy</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index" asp-route-mine="true">Ver todas</a></div>
+        @if (Model.MyTasksToday.Count == 0) { <p class="subtle">No tenés actividades pendientes asignadas para hoy.</p> }
+        @foreach (var activity in Model.MyTasksToday) { <div class="today-task"><span class="task-time">@ActivitySchedule.ToLocal(activity.ScheduledAtUtc).ToString("HH:mm")</span><div><strong>@activity.Title</strong><small>@ActivitySchedule.TypeLabel(activity.Type) · <a asp-controller="Customers" asp-action="Details" asp-route-id="@activity.CustomerId">@activity.Customer.Name</a></small></div><span class="priority priority-@activity.Priority.ToString().ToLowerInvariant()">@ActivitySchedule.PriorityLabel(activity.Priority)</span></div> }
+    </div>
+</section>

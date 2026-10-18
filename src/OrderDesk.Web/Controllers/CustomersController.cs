@@ -97,11 +97,20 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == id, ct);
         if (customer is null) return NotFound();
+        var activities = await db.CustomerActivities.AsNoTracking()
+            .Include(x => x.AssignedUser)
+            .Where(x => x.CustomerId == id)
+            .OrderBy(x => x.Status).ThenBy(x => x.ScheduledAtUtc)
+            .ToListAsync(ct);
         var timeline = customer.Notes.Select(n => new CustomerTimelineItemVm(n.CreatedAtUtc, "note", "Nota interna", n.Content, n.CreatedByUser?.FullName))
             .Concat(customer.Orders.Select(o => new CustomerTimelineItemVm(o.CreatedAtUtc, "order", $"Pedido {o.Number}", $"{o.Description} · {o.Total:C0}")))
             .Concat(customer.Orders.SelectMany(o => o.StatusHistory.Select(h => new CustomerTimelineItemVm(h.ChangedAtUtc, "status", $"Estado de {o.Number}", $"{(h.PreviousStatus.HasValue ? OrdersController.StatusLabel(h.PreviousStatus.Value) + " → " : "")} {OrdersController.StatusLabel(h.NewStatus)}", h.ChangedByUser?.FullName ?? h.Source))))
+            .Concat(activities.Select(a => new CustomerTimelineItemVm(a.CreatedAtUtc, "activity", $"{ActivitySchedule.TypeLabel(a.Type)} programada: {a.Title}",
+                $"Para {ActivitySchedule.ToLocal(a.ScheduledAtUtc):dd/MM/yyyy HH:mm} · Responsable: {a.AssignedUser?.FullName ?? "Sin asignar"}")))
+            .Concat(activities.Where(a => a.CompletedAtUtc.HasValue).Select(a => new CustomerTimelineItemVm(a.CompletedAtUtc!.Value, "activity", $"{ActivitySchedule.TypeLabel(a.Type)} realizada: {a.Title}",
+                a.Description ?? "Actividad completada")))
             .OrderByDescending(x => x.OccurredAtUtc).ToList();
-        return View(new CustomerDetailVm(customer, timeline));
+        return View(new CustomerDetailVm(customer, timeline, activities));
     }
 
     [HttpPost, ValidateAntiForgeryToken]

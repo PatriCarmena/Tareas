@@ -2,6 +2,12 @@
 
 Aplicación MVC en ASP.NET Core 10 para administrar clientes y sus pedidos, persistida en PostgreSQL. Incluye una API externa mock independiente y un webhook idempotente para actualizar el estado de pedidos.
 
+## Actividades y seguimiento
+
+Desde la ficha de un cliente, un administrador u operador puede programar llamadas, correos, reuniones o tareas. Cada actividad tiene fecha y hora de Buenos Aires, responsable, prioridad y descripción opcional. Se puede editar mientras esté pendiente y marcarla como realizada desde la ficha o desde **Actividades**. Los usuarios de consulta pueden verlas sin modificarlas.
+
+La vista **Actividades** permite buscar por título o cliente y filtrar por tipo, estado o responsable actual. Una actividad pendiente pasa a mostrarse como **Vencida** automáticamente cuando supera su hora programada. El dashboard muestra las actividades programadas para hoy, las vencidas y **Mis tareas de hoy**. La ficha del cliente incorpora las actividades a la línea de tiempo; al completar una llamada, correo o reunión actualiza la fecha del último contacto.
+
 ## Inicio rápido con Docker
 
 Requiere Docker Desktop:

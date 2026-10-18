@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="~/css/features.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dialogs.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/crm.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/activities.css" asp-append-version="true" />
 </head>
 <body>
     <header class="topbar">
@@ -18,7 +19,7 @@
         </a>
         @if (User.Identity?.IsAuthenticated == true)
         {
-            <nav><a asp-controller="Dashboard" asp-action="Index">Dashboard</a><a asp-controller="Customers" asp-action="Index">Clientes</a><a asp-controller="Orders" asp-action="Index">Pedidos</a>@if (User.IsInRole(AppRoles.Administrator)) { <a asp-controller="Users" asp-action="Index">Usuarios</a> }<form asp-controller="Account" asp-action="Logout" method="post"><button class="nav-link" type="submit">Salir</button></form></nav>
+            <nav><a asp-controller="Dashboard" asp-action="Index">Dashboard</a><a asp-controller="Customers" asp-action="Index">Clientes</a><a asp-controller="Orders" asp-action="Index">Pedidos</a><a asp-controller="Activities" asp-action="Index">Actividades</a>@if (User.IsInRole(AppRoles.Administrator)) { <a asp-controller="Users" asp-action="Index">Usuarios</a> }<form asp-controller="Account" asp-action="Logout" method="post"><button class="nav-link" type="submit">Salir</button></form></nav>
         }
     </header>
     <main class="shell">

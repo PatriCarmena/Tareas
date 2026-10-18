@@ -223,6 +223,42 @@ namespace OrderDesk.Web.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("OrderDesk.Web.Models.CustomerActivity", b =>
+                {
+                    b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("AssignedUserId").HasColumnType("text");
+                    b.Property<DateTime?>("CompletedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("CreatedByUserId").HasColumnType("text");
+                    b.Property<int>("CustomerId").HasColumnType("integer");
+                    b.Property<string>("Description").HasMaxLength(2000).HasColumnType("character varying(2000)");
+                    b.Property<string>("Priority").IsRequired().HasColumnType("text");
+                    b.Property<DateTime>("ScheduledAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("Status").IsRequired().HasColumnType("text");
+                    b.Property<string>("Title").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("Type").IsRequired().HasColumnType("text");
+                    b.HasKey("Id");
+                    b.HasIndex("AssignedUserId", "Status", "ScheduledAtUtc");
+                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CustomerId", "ScheduledAtUtc");
+                    b.ToTable("CustomerActivities");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.CustomerNote", b =>
+                {
+                    b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("Content").IsRequired().HasMaxLength(2000).HasColumnType("character varying(2000)");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("CreatedByUserId").HasColumnType("text");
+                    b.Property<int>("CustomerId").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CustomerId", "CreatedAtUtc");
+                    b.ToTable("CustomerNotes");
+                });
+
             modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -235,6 +271,10 @@ namespace OrderDesk.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("AdditionalInfo").HasMaxLength(500).HasColumnType("character varying(500)");
+                    b.Property<string>("AssignedUserId").HasColumnType("text");
+                    b.Property<string>("Company").HasMaxLength(160).HasColumnType("character varying(160)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -242,6 +282,8 @@ namespace OrderDesk.Web.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)");
+
+                    b.Property<DateTime?>("LastContactAtUtc").HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -252,12 +294,47 @@ namespace OrderDesk.Web.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("Position").HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<string>("Tags").HasMaxLength(250).HasColumnType("character varying(250)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("AssignedUserId");
+
                     b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.CustomerActivity", b =>
+                {
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "AssignedUser").WithMany()
+                        .HasForeignKey("AssignedUserId").OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "CreatedByUser").WithMany()
+                        .HasForeignKey("CreatedByUserId").OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("OrderDesk.Web.Models.Customer", "Customer").WithMany("Activities")
+                        .HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                    b.Navigation("AssignedUser");
+                    b.Navigation("CreatedByUser");
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.CustomerNote", b =>
+                {
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "CreatedByUser").WithMany()
+                        .HasForeignKey("CreatedByUserId").OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("OrderDesk.Web.Models.Customer", "Customer").WithMany("Notes")
+                        .HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                    b.Navigation("CreatedByUser");
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
+                {
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "AssignedUser").WithMany()
+                        .HasForeignKey("AssignedUserId").OnDelete(DeleteBehavior.SetNull);
+                    b.Navigation("AssignedUser");
                 });
 
             modelBuilder.Entity("OrderDesk.Web.Models.Order", b =>
@@ -505,6 +582,8 @@ namespace OrderDesk.Web.Data.Migrations
 
             modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
                 {
+                    b.Navigation("Activities");
+                    b.Navigation("Notes");
                     b.Navigation("Orders");
                 });
 

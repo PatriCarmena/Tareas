@@ -39,4 +39,5 @@ public sealed class Customer
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public List<Order> Orders { get; set; } = [];
     public List<CustomerNote> Notes { get; set; } = [];
+    public List<CustomerActivity> Activities { get; set; } = [];
 }

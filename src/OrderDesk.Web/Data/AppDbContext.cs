@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
     public DbSet<CustomerNote> CustomerNotes => Set<CustomerNote>();
+    public DbSet<CustomerActivity> CustomerActivities => Set<CustomerActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,5 +28,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         modelBuilder.Entity<Customer>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<CustomerNote>().HasIndex(x => new { x.CustomerId, x.CreatedAtUtc });
         modelBuilder.Entity<CustomerNote>().HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<CustomerActivity>().Property(x => x.Type).HasConversion<string>();
+        modelBuilder.Entity<CustomerActivity>().Property(x => x.Priority).HasConversion<string>();
+        modelBuilder.Entity<CustomerActivity>().Property(x => x.Status).HasConversion<string>();
+        modelBuilder.Entity<CustomerActivity>().HasIndex(x => new { x.AssignedUserId, x.Status, x.ScheduledAtUtc });
+        modelBuilder.Entity<CustomerActivity>().HasIndex(x => new { x.CustomerId, x.ScheduledAtUtc });
+        modelBuilder.Entity<CustomerActivity>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<CustomerActivity>().HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }

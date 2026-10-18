@@ -1,0 +1,20 @@
+@model ActivityFormVm
+@{ var editing = Model.Id > 0; ViewData["Title"] = editing ? "Editar actividad" : "Nueva actividad"; }
+<div class="narrow">
+    <a class="back" asp-controller="Customers" asp-action="Details" asp-route-id="@Model.CustomerId">← Volver a @ViewBag.CustomerName</a>
+    <div class="form-card">
+        <p class="eyebrow">SEGUIMIENTO · @ViewBag.CustomerName</p>
+        <h1>@(editing ? "Editar actividad" : "Programar actividad")</h1>
+        <form asp-action="@(editing ? "Edit" : "Create")" asp-route-id="@(editing ? Model.Id.ToString() : null)" method="post">
+            <input asp-for="Id" type="hidden" /><input asp-for="CustomerId" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="validation"></div>
+            <div class="field"><label asp-for="Title">Título</label><input asp-for="Title" maxlength="160" placeholder="Ej.: Llamar para revisar la propuesta" /><span asp-validation-for="Title"></span></div>
+            <div class="field-row"><div class="field"><label asp-for="Type">Tipo</label><select asp-for="Type"><option value="Call">Llamada</option><option value="Email">Correo</option><option value="Meeting">Reunión</option><option value="Task">Tarea</option></select><span asp-validation-for="Type"></span></div>
+                <div class="field"><label asp-for="Priority">Prioridad</label><select asp-for="Priority"><option value="Low">Baja</option><option value="Normal">Normal</option><option value="High">Alta</option></select><span asp-validation-for="Priority"></span></div></div>
+            <div class="field-row"><div class="field"><label asp-for="ScheduledAt">Fecha y hora programada</label><input asp-for="ScheduledAt" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" /><small class="field-help">Horario de Buenos Aires (Argentina).</small><span asp-validation-for="ScheduledAt"></span></div>
+                <div class="field"><label asp-for="AssignedUserId">Responsable</label><select asp-for="AssignedUserId" asp-items="ViewBag.Assignees"><option value="">Seleccioná una persona</option></select><span asp-validation-for="AssignedUserId"></span></div></div>
+            <div class="field"><label asp-for="Description">Descripción u objetivo</label><textarea asp-for="Description" rows="4" maxlength="2000" placeholder="Detalles para preparar esta actividad"></textarea><span asp-validation-for="Description"></span></div>
+            <div class="form-actions"><a class="button button-secondary" asp-controller="Customers" asp-action="Details" asp-route-id="@Model.CustomerId">Cancelar</a><button class="button" type="submit">@(editing ? "Guardar cambios" : "Programar actividad")</button></div>
+        </form>
+    </div>
+</div>

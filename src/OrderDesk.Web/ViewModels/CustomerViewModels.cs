@@ -16,7 +16,8 @@ public sealed class CustomerListItemVm
 
 public sealed record CustomerListVm(IReadOnlyList<CustomerListItemVm> Customers, string? Query, OrderStatus? Status, int Page, int TotalPages, int TotalItems);
 public sealed record CustomerTimelineItemVm(DateTime OccurredAtUtc, string Type, string Title, string Description, string? Author = null);
-public sealed record CustomerDetailVm(Customer Customer, IReadOnlyList<CustomerTimelineItemVm> Timeline);
+public sealed record CustomerDetailVm(Customer Customer, IReadOnlyList<CustomerTimelineItemVm> Timeline, IReadOnlyList<CustomerActivity> Activities);
 public sealed record OrderListVm(IReadOnlyList<Order> Orders, string? Query, OrderStatus? Status, int Page, int TotalPages, int TotalItems);
 public sealed record DashboardStatusVm(OrderStatus Status, int Count, decimal Total);
-public sealed record DashboardVm(int CustomerCount, int OrderCount, decimal Total, IReadOnlyList<DashboardStatusVm> ByStatus);
+public sealed record DashboardVm(int CustomerCount, int OrderCount, decimal Total, IReadOnlyList<DashboardStatusVm> ByStatus,
+    int DueTodayCount, int OverdueCount, IReadOnlyList<CustomerActivity> MyTasksToday);
