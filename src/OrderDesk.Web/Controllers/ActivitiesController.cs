@@ -18,7 +18,7 @@ public sealed class ActivitiesController(AppDbContext db) : Controller
         const int pageSize = 12;
         page = Math.Max(1, page);
         var now = DateTime.UtcNow;
-        var (todayStart, tomorrowStart) = ActivitySchedule.TodayUtc(now);
+        var (_, tomorrowStart) = ActivitySchedule.TodayUtc(now);
         var items = db.CustomerActivities.AsNoTracking().Include(x => x.Customer).Include(x => x.AssignedUser).AsQueryable();
         if (!string.IsNullOrWhiteSpace(query))
         {
@@ -36,7 +36,7 @@ public sealed class ActivitiesController(AppDbContext db) : Controller
             "completed" => items.Where(x => x.Status == ActivityStatus.Completed),
             "overdue" => items.Where(x => x.Status == ActivityStatus.Pending && x.ScheduledAtUtc < now),
             "pending" => items.Where(x => x.Status == ActivityStatus.Pending && x.ScheduledAtUtc >= now),
-            "today" => items.Where(x => x.Status == ActivityStatus.Pending && x.ScheduledAtUtc >= todayStart && x.ScheduledAtUtc < tomorrowStart),
+            "today" => items.Where(x => x.Status == ActivityStatus.Pending && x.ScheduledAtUtc >= now && x.ScheduledAtUtc < tomorrowStart),
             _ => items
         };
         var total = await items.CountAsync(ct);
@@ -92,7 +92,7 @@ public sealed class ActivitiesController(AppDbContext db) : Controller
         {
             Id = activity.Id, CustomerId = activity.CustomerId, Title = activity.Title,
             Description = activity.Description, Type = activity.Type, Priority = activity.Priority,
-            ScheduledAt = ActivitySchedule.ToLocal(activity.ScheduledAtUtc), AssignedUserId = activity.AssignedUserId
+            ScheduledAt = ActivitySchedule.ToLocal(activity.ScheduledAtUtc), AssignedUserId = activity.AssignedUserId ?? string.Empty
         };
         await LoadFormOptions(model, ct);
         return View("Form", model);

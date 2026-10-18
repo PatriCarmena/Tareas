@@ -20,7 +20,7 @@ public sealed class DashboardController(AppDbContext db) : Controller
         var now = DateTime.UtcNow;
         var (todayStart, tomorrowStart) = ActivitySchedule.TodayUtc(now);
         var openActivities = db.CustomerActivities.AsNoTracking().Where(x => x.Status == ActivityStatus.Pending);
-        var dueToday = await openActivities.CountAsync(x => x.ScheduledAtUtc >= todayStart && x.ScheduledAtUtc < tomorrowStart, ct);
+        var dueToday = await openActivities.CountAsync(x => x.ScheduledAtUtc >= now && x.ScheduledAtUtc < tomorrowStart, ct);
         var overdue = await openActivities.CountAsync(x => x.ScheduledAtUtc < now, ct);
         var myId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var myTasks = await openActivities.Include(x => x.Customer)
