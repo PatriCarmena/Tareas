@@ -28,6 +28,7 @@
 .customer-opportunity>span{white-space:nowrap;font-weight:800}
 .stage-won{background:#e9f5ed}
 .stage-lost{background:#f8ecee}
+.lost-reason-field[hidden]{display:none}.opportunity-stage-form{flex-wrap:wrap}.opportunity-stage-form .lost-reason-field{flex-basis:100%}.opportunity-stage-form .lost-reason-field input{width:100%;font-size:.78rem}.lost-reason{display:block;margin-top:7px;font-size:.77rem;color:#8a3341}
 @media(max-width:1100px){.kanban-board{grid-template-columns:repeat(6,245px)}}
 @media(max-width:800px){.topbar nav a:nth-child(5){display:inline}.topbar nav a:nth-child(6){display:none}}
 @media(max-width:700px){.opportunity-filters{grid-template-columns:1fr 1fr}.opportunity-filters .search{grid-column:1/-1}}

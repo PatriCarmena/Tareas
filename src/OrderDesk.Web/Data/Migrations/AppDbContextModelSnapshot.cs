@@ -264,11 +264,13 @@ namespace OrderDesk.Web.Data.Migrations
                     b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
                     b.Property<string>("AssignedUserId").HasColumnType("text");
+                    b.Property<DateTime?>("ClosedAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<int>("CustomerId").HasColumnType("integer");
                     b.Property<decimal>("EstimatedAmount").HasColumnType("numeric(12,2)");
                     b.Property<DateOnly>("ExpectedCloseDate").HasColumnType("date");
                     b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("LostReason").HasMaxLength(250).HasColumnType("character varying(250)");
                     b.Property<int>("Probability").HasColumnType("integer");
                     b.Property<string>("Stage").IsRequired().HasColumnType("text");
                     b.Property<DateTime>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
@@ -413,6 +415,10 @@ namespace OrderDesk.Web.Data.Migrations
 
                     b.Property<int?>("OpportunityId").HasColumnType("integer");
 
+                    b.Property<string>("SalespersonId").HasColumnType("text");
+
+                    b.Property<string>("SalespersonName").HasMaxLength(120).HasColumnType("character varying(120)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -431,6 +437,8 @@ namespace OrderDesk.Web.Data.Migrations
                         .IsUnique();
 
                     b.HasIndex("OpportunityId").IsUnique();
+
+                    b.HasIndex("SalespersonId");
 
                     b.ToTable("Orders");
                 });
@@ -597,8 +605,14 @@ namespace OrderDesk.Web.Data.Migrations
                         .HasForeignKey("OrderDesk.Web.Models.Order", "OpportunityId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("OrderDesk.Web.Models.AppUser", "Salesperson")
+                        .WithMany()
+                        .HasForeignKey("SalespersonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Customer");
                     b.Navigation("Opportunity");
+                    b.Navigation("Salesperson");
                 });
 
             modelBuilder.Entity("OrderDesk.Web.Models.OrderStatusHistory", b =>

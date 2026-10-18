@@ -1,4 +1,23 @@
 (() => {
+    const updateLostReason = (container, stage) => {
+        const field = container.querySelector('.lost-reason-field');
+        const input = field?.querySelector('input');
+        if (!field || !input) return;
+        field.hidden = stage !== 'Lost';
+        input.required = stage === 'Lost';
+    };
+    document.querySelectorAll('.opportunity-stage-form').forEach(form => {
+        const select = form.querySelector('select[name="stage"]');
+        if (!select) return;
+        updateLostReason(form, select.value);
+        select.addEventListener('change', () => updateLostReason(form, select.value));
+    });
+    const detailStage = document.getElementById('Stage');
+    if (detailStage) {
+        const form = detailStage.closest('form');
+        updateLostReason(form, detailStage.value);
+        detailStage.addEventListener('change', () => updateLostReason(form, detailStage.value));
+    }
     let dragged = null;
     document.querySelectorAll('.opportunity-card[draggable="true"]').forEach(card => {
         card.addEventListener('dragstart', event => {
@@ -31,6 +50,11 @@
             const select = form?.querySelector('select[name="stage"]');
             if (!form || !select) return;
             select.value = column.dataset.stage;
+            updateLostReason(form, select.value);
+            if (select.value === 'Lost') {
+                form.querySelector('.lost-reason-field input')?.focus();
+                return;
+            }
             form.requestSubmit();
         });
     });

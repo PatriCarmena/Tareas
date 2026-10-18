@@ -13,7 +13,7 @@ namespace OrderDesk.Web.Controllers;
 [ApiController, AllowAnonymous, Route("api/webhooks/opportunities")]
 public sealed class OpportunityWebhooksController(AppDbContext db, IConfiguration configuration) : ControllerBase
 {
-    public sealed record OpportunityStageEvent(string EventId, int OpportunityId, OpportunityStage Stage);
+    public sealed record OpportunityStageEvent(string EventId, int OpportunityId, OpportunityStage Stage, string? LostReason);
 
     [HttpPost]
     public async Task<IActionResult> UpdateStage([FromBody] OpportunityStageEvent message, CancellationToken ct)
@@ -25,6 +25,8 @@ public sealed class OpportunityWebhooksController(AppDbContext db, IConfiguratio
         if (string.IsNullOrWhiteSpace(message.EventId) || message.EventId.Length > 160)
             return BadRequest(new { error = "eventId debe tener entre 1 y 160 caracteres" });
         if (!Enum.IsDefined(message.Stage)) return BadRequest(new { error = "Etapa inválida" });
+        if (message.Stage == OpportunityStage.Lost && (string.IsNullOrWhiteSpace(message.LostReason) || message.LostReason.Trim().Length > 250))
+            return BadRequest(new { error = "lostReason es obligatorio al perder una oportunidad y no puede superar los 250 caracteres" });
         if (await db.OpportunityWebhookReceipts.AnyAsync(x => x.EventId == message.EventId, ct))
             return Ok(new { duplicate = true });
 
@@ -32,11 +34,14 @@ public sealed class OpportunityWebhooksController(AppDbContext db, IConfiguratio
         if (opportunity is null) return NotFound(new { error = "Oportunidad inexistente" });
         if (message.Stage != OpportunityStage.Won && await db.Orders.AnyAsync(x => x.OpportunityId == opportunity.Id, ct))
             return Conflict(new { error = "La oportunidad ya se convirtió en pedido y debe permanecer ganada" });
-        if (opportunity.Stage != message.Stage)
+        if (opportunity.Stage != message.Stage || message.Stage == OpportunityStage.Lost && opportunity.LostReason != message.LostReason?.Trim())
         {
+            var stageChanged = opportunity.Stage != message.Stage;
             opportunity.Stage = message.Stage;
+            opportunity.LostReason = message.Stage == OpportunityStage.Lost ? message.LostReason?.Trim() : null;
+            if (stageChanged) opportunity.ClosedAtUtc = message.Stage is OpportunityStage.Won or OpportunityStage.Lost ? DateTime.UtcNow : null;
             opportunity.UpdatedAtUtc = DateTime.UtcNow;
-            await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
+            if (stageChanged) await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
         }
         db.OpportunityWebhookReceipts.Add(new OpportunityWebhookReceipt { EventId = message.EventId, OpportunityId = opportunity.Id });
         try { await db.SaveChangesAsync(ct); }

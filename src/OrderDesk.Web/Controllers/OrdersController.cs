@@ -38,8 +38,13 @@ public sealed class OrdersController(AppDbContext db) : Controller
         // La vinculación con una oportunidad solo se establece desde la conversión controlada.
         order.OpportunityId = null;
         order.Opportunity = null;
+        order.SalespersonId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        order.SalespersonName = await db.Users.Where(x => x.Id == order.SalespersonId).Select(x => x.FullName).FirstOrDefaultAsync(ct);
         ModelState.Remove(nameof(Order.OpportunityId));
         ModelState.Remove(nameof(Order.Opportunity));
+        ModelState.Remove(nameof(Order.SalespersonId));
+        ModelState.Remove(nameof(Order.SalespersonName));
+        ModelState.Remove(nameof(Order.Salesperson));
         ModelState.Remove(nameof(Order.Customer));
         ModelState.Remove(nameof(Order.WebhookReceipts));
         if (!ModelState.IsValid)

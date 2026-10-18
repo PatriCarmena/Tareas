@@ -22,5 +22,9 @@ public sealed class Opportunity
     public AppUser? AssignedUser { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? ClosedAtUtc { get; set; }
+
+    [StringLength(250)]
+    public string? LostReason { get; set; }
     public Order? ConvertedOrder { get; set; }
 }

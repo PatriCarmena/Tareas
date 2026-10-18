@@ -44,6 +44,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         modelBuilder.Entity<Opportunity>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Order>().HasOne(x => x.Opportunity).WithOne(x => x.ConvertedOrder).HasForeignKey<Order>(x => x.OpportunityId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Order>().HasIndex(x => x.OpportunityId).IsUnique();
+        modelBuilder.Entity<Order>().HasOne(x => x.Salesperson).WithMany().HasForeignKey(x => x.SalespersonId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<OpportunityWebhookReceipt>().HasIndex(x => x.EventId).IsUnique();
         modelBuilder.Entity<OpportunityWebhookReceipt>().HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
     }

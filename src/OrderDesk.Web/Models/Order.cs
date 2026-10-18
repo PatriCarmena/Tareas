@@ -12,6 +12,11 @@ public sealed class Order
     public Customer Customer { get; set; } = null!;
     public int? OpportunityId { get; set; }
     public Opportunity? Opportunity { get; set; }
+    public string? SalespersonId { get; set; }
+    public AppUser? Salesperson { get; set; }
+
+    [StringLength(120)]
+    public string? SalespersonName { get; set; }
 
     [Required(ErrorMessage = "Ingresá el número del pedido."), StringLength(80, ErrorMessage = "El número no puede superar los 80 caracteres."), Display(Name = "Número")]
     public string Number { get; set; } = string.Empty;

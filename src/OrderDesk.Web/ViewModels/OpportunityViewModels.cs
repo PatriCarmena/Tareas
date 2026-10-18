@@ -24,6 +24,9 @@ public sealed class OpportunityFormVm
 
     public OpportunityStage Stage { get; set; } = OpportunityStage.Prospect;
 
+    [StringLength(250, ErrorMessage = "El motivo no puede superar los 250 caracteres.")]
+    public string? LostReason { get; set; }
+
     [Required(ErrorMessage = "Seleccioná un responsable.")]
     public string AssignedUserId { get; set; } = string.Empty;
 }

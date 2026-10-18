@@ -56,7 +56,9 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
             Probability = model.Probability,
             ExpectedCloseDate = model.ExpectedCloseDate!.Value,
             AssignedUserId = model.AssignedUserId,
-            Stage = model.Stage
+            Stage = model.Stage,
+            LostReason = model.Stage == OpportunityStage.Lost ? model.LostReason?.Trim() : null,
+            ClosedAtUtc = model.Stage is OpportunityStage.Won or OpportunityStage.Lost ? DateTime.UtcNow : null
         };
         db.Opportunities.Add(opportunity);
         await db.SaveChangesAsync(ct);
@@ -80,7 +82,8 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
             Probability = opportunity.Probability,
             ExpectedCloseDate = opportunity.ExpectedCloseDate,
             AssignedUserId = opportunity.AssignedUserId ?? string.Empty,
-            Stage = opportunity.Stage
+            Stage = opportunity.Stage,
+            LostReason = opportunity.LostReason
         };
         await LoadFormOptions(model, ct);
         return View("Form", model);
@@ -110,6 +113,9 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
         opportunity.ExpectedCloseDate = model.ExpectedCloseDate!.Value;
         opportunity.AssignedUserId = model.AssignedUserId;
         opportunity.Stage = model.Stage;
+        opportunity.LostReason = model.Stage == OpportunityStage.Lost ? model.LostReason?.Trim() : null;
+        if (previousStage != opportunity.Stage)
+            opportunity.ClosedAtUtc = opportunity.Stage is OpportunityStage.Won or OpportunityStage.Lost ? DateTime.UtcNow : null;
         opportunity.UpdatedAtUtc = DateTime.UtcNow;
         if (previousStage != opportunity.Stage) await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
         await db.SaveChangesAsync(ct);
@@ -119,9 +125,14 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
 
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
-    public async Task<IActionResult> ChangeStage(int id, OpportunityStage stage, CancellationToken ct)
+    public async Task<IActionResult> ChangeStage(int id, OpportunityStage stage, string? lostReason, CancellationToken ct)
     {
         if (!Enum.IsDefined(stage)) return BadRequest();
+        if (stage == OpportunityStage.Lost && (string.IsNullOrWhiteSpace(lostReason) || lostReason.Trim().Length > 250))
+        {
+            TempData["Error"] = "Ingresá un motivo de pérdida de hasta 250 caracteres.";
+            return RedirectToAction(nameof(Index));
+        }
         var opportunity = await db.Opportunities.FindAsync([id], ct);
         if (opportunity is null) return NotFound();
         if (stage != OpportunityStage.Won && await db.Orders.AnyAsync(x => x.OpportunityId == id, ct))
@@ -129,11 +140,14 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
             TempData["Error"] = "La oportunidad ya fue convertida en pedido y debe permanecer ganada.";
             return RedirectToAction(nameof(Index));
         }
-        if (opportunity.Stage != stage)
+        if (opportunity.Stage != stage || stage == OpportunityStage.Lost && opportunity.LostReason != lostReason?.Trim())
         {
+            var stageChanged = opportunity.Stage != stage;
             opportunity.Stage = stage;
+            opportunity.LostReason = stage == OpportunityStage.Lost ? lostReason?.Trim() : null;
+            if (stageChanged) opportunity.ClosedAtUtc = stage is OpportunityStage.Won or OpportunityStage.Lost ? DateTime.UtcNow : null;
             opportunity.UpdatedAtUtc = DateTime.UtcNow;
-            await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
+            if (stageChanged) await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
             await db.SaveChangesAsync(ct);
             TempData["Success"] = $"Oportunidad movida a {StageLabel(stage)}.";
         }
@@ -172,6 +186,8 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
                 Number = $"PED-OPP-{opportunity.Id}",
                 Description = opportunity.Name,
                 Total = opportunity.EstimatedAmount,
+                SalespersonId = opportunity.AssignedUserId,
+                SalespersonName = await db.Users.Where(x => x.Id == opportunity.AssignedUserId).Select(x => x.FullName).FirstOrDefaultAsync(ct),
                 Status = OrderStatus.Pending
             };
             db.Orders.Add(order);
@@ -224,6 +240,8 @@ public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailS
     private async Task ValidateForm(OpportunityFormVm model, CancellationToken ct)
     {
         if (!Enum.IsDefined(model.Stage)) ModelState.AddModelError(nameof(model.Stage), "Seleccioná una etapa válida.");
+        if (model.Stage == OpportunityStage.Lost && string.IsNullOrWhiteSpace(model.LostReason))
+            ModelState.AddModelError(nameof(model.LostReason), "Ingresá el motivo por el que se perdió la oportunidad.");
         if (!await db.Customers.AnyAsync(x => x.Id == model.CustomerId, ct)) ModelState.AddModelError(nameof(model.CustomerId), "El cliente no existe.");
         if (string.IsNullOrWhiteSpace(model.AssignedUserId) || !await db.Users.AnyAsync(x => x.Id == model.AssignedUserId, ct))
             ModelState.AddModelError(nameof(model.AssignedUserId), "Seleccioná un responsable válido.");
