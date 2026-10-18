@@ -279,6 +279,19 @@ namespace OrderDesk.Web.Data.Migrations
                     b.ToTable("Opportunities");
                 });
 
+            modelBuilder.Entity("OrderDesk.Web.Models.OpportunityWebhookReceipt", b =>
+                {
+                    b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("EventId").IsRequired().HasColumnType("text");
+                    b.Property<int>("OpportunityId").HasColumnType("integer");
+                    b.Property<DateTime>("ProcessedAtUtc").HasColumnType("timestamp with time zone");
+                    b.HasKey("Id");
+                    b.HasIndex("EventId").IsUnique();
+                    b.HasIndex("OpportunityId");
+                    b.ToTable("OpportunityWebhookReceipts");
+                });
+
             modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -360,6 +373,13 @@ namespace OrderDesk.Web.Data.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("OrderDesk.Web.Models.OpportunityWebhookReceipt", b =>
+                {
+                    b.HasOne("OrderDesk.Web.Models.Opportunity", "Opportunity").WithMany()
+                        .HasForeignKey("OpportunityId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                    b.Navigation("Opportunity");
+                });
+
             modelBuilder.Entity("OrderDesk.Web.Models.Customer", b =>
                 {
                     b.HasOne("OrderDesk.Web.Models.AppUser", "AssignedUser").WithMany()
@@ -391,6 +411,8 @@ namespace OrderDesk.Web.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<int?>("OpportunityId").HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -407,6 +429,8 @@ namespace OrderDesk.Web.Data.Migrations
 
                     b.HasIndex("Number")
                         .IsUnique();
+
+                    b.HasIndex("OpportunityId").IsUnique();
 
                     b.ToTable("Orders");
                 });
@@ -568,7 +592,13 @@ namespace OrderDesk.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("OrderDesk.Web.Models.Opportunity", "Opportunity")
+                        .WithOne("ConvertedOrder")
+                        .HasForeignKey("OrderDesk.Web.Models.Order", "OpportunityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Customer");
+                    b.Navigation("Opportunity");
                 });
 
             modelBuilder.Entity("OrderDesk.Web.Models.OrderStatusHistory", b =>
@@ -623,6 +653,11 @@ namespace OrderDesk.Web.Data.Migrations
                     b.Navigation("StatusHistory");
 
                     b.Navigation("WebhookReceipts");
+                });
+
+            modelBuilder.Entity("OrderDesk.Web.Models.Opportunity", b =>
+                {
+                    b.Navigation("ConvertedOrder");
                 });
 #pragma warning restore 612, 618
         }

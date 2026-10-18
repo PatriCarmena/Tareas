@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
     public DbSet<CustomerNote> CustomerNotes => Set<CustomerNote>();
     public DbSet<CustomerActivity> CustomerActivities => Set<CustomerActivity>();
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
+    public DbSet<OpportunityWebhookReceipt> OpportunityWebhookReceipts => Set<OpportunityWebhookReceipt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,5 +42,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : Ident
         modelBuilder.Entity<Opportunity>().HasIndex(x => new { x.Stage, x.ExpectedCloseDate });
         modelBuilder.Entity<Opportunity>().HasIndex(x => x.CustomerId);
         modelBuilder.Entity<Opportunity>().HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Order>().HasOne(x => x.Opportunity).WithOne(x => x.ConvertedOrder).HasForeignKey<Order>(x => x.OpportunityId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Order>().HasIndex(x => x.OpportunityId).IsUnique();
+        modelBuilder.Entity<OpportunityWebhookReceipt>().HasIndex(x => x.EventId).IsUnique();
+        modelBuilder.Entity<OpportunityWebhookReceipt>().HasOne(x => x.Opportunity).WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
     }
 }

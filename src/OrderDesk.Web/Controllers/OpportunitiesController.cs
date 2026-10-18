@@ -3,18 +3,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OrderDesk.Web.Data;
 using OrderDesk.Web.Models;
+using OrderDesk.Web.Services;
 using OrderDesk.Web.ViewModels;
 
 namespace OrderDesk.Web.Controllers;
 
 [Authorize]
-public sealed class OpportunitiesController(AppDbContext db) : Controller
+public sealed class OpportunitiesController(AppDbContext db, IEmailSender emailSender, ILogger<OpportunitiesController> logger) : Controller
 {
     public async Task<IActionResult> Index(string? query, string? assignedUserId, CancellationToken ct)
     {
-        var items = db.Opportunities.AsNoTracking().Include(x => x.Customer).Include(x => x.AssignedUser).AsQueryable();
+        var items = db.Opportunities.AsNoTracking().Include(x => x.Customer).Include(x => x.AssignedUser).Include(x => x.ConvertedOrder).AsQueryable();
         if (!string.IsNullOrWhiteSpace(query))
         {
             var term = query.Trim();
@@ -58,6 +60,8 @@ public sealed class OpportunitiesController(AppDbContext db) : Controller
         };
         db.Opportunities.Add(opportunity);
         await db.SaveChangesAsync(ct);
+        await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
+        await db.SaveChangesAsync(ct);
         TempData["Success"] = "Oportunidad creada correctamente.";
         return RedirectToAction(nameof(Index));
     }
@@ -89,9 +93,17 @@ public sealed class OpportunitiesController(AppDbContext db) : Controller
         if (id != model.Id) return BadRequest();
         var opportunity = await db.Opportunities.FindAsync([id], ct);
         if (opportunity is null) return NotFound();
+        var converted = await db.Orders.AnyAsync(x => x.OpportunityId == id, ct);
+        if (converted && model.Stage != OpportunityStage.Won)
+        {
+            ModelState.AddModelError(nameof(model.Stage), "Una oportunidad convertida en pedido debe permanecer ganada.");
+        }
+        if (converted && model.EstimatedAmount != opportunity.EstimatedAmount)
+            ModelState.AddModelError(nameof(model.EstimatedAmount), "El importe de una oportunidad convertida no puede cambiar; editá el pedido por separado.");
         if (model.CustomerId != opportunity.CustomerId) return BadRequest();
         await ValidateForm(model, ct);
         if (!ModelState.IsValid) { await LoadFormOptions(model, ct); return View("Form", model); }
+        var previousStage = opportunity.Stage;
         opportunity.Name = model.Name.Trim();
         opportunity.EstimatedAmount = model.EstimatedAmount;
         opportunity.Probability = model.Probability;
@@ -99,6 +111,7 @@ public sealed class OpportunitiesController(AppDbContext db) : Controller
         opportunity.AssignedUserId = model.AssignedUserId;
         opportunity.Stage = model.Stage;
         opportunity.UpdatedAtUtc = DateTime.UtcNow;
+        if (previousStage != opportunity.Stage) await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
         await db.SaveChangesAsync(ct);
         TempData["Success"] = "Oportunidad actualizada correctamente.";
         return RedirectToAction(nameof(Index));
@@ -111,14 +124,90 @@ public sealed class OpportunitiesController(AppDbContext db) : Controller
         if (!Enum.IsDefined(stage)) return BadRequest();
         var opportunity = await db.Opportunities.FindAsync([id], ct);
         if (opportunity is null) return NotFound();
+        if (stage != OpportunityStage.Won && await db.Orders.AnyAsync(x => x.OpportunityId == id, ct))
+        {
+            TempData["Error"] = "La oportunidad ya fue convertida en pedido y debe permanecer ganada.";
+            return RedirectToAction(nameof(Index));
+        }
         if (opportunity.Stage != stage)
         {
             opportunity.Stage = stage;
             opportunity.UpdatedAtUtc = DateTime.UtcNow;
+            await OpportunityAutomation.QueueFollowUpAsync(db, opportunity, ct);
             await db.SaveChangesAsync(ct);
             TempData["Success"] = $"Oportunidad movida a {StageLabel(stage)}.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
+    public async Task<IActionResult> Convert(int id, CancellationToken ct)
+    {
+        var opportunity = await db.Opportunities.Include(x => x.Customer).SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (opportunity is null) return NotFound();
+        if (opportunity.Stage != OpportunityStage.Won)
+        {
+            TempData["Error"] = "Solo se pueden convertir oportunidades ganadas.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (opportunity.EstimatedAmount <= 0 || opportunity.EstimatedAmount > 999999999)
+        {
+            TempData["Error"] = "Ajustá el importe de la oportunidad a un valor entre 0,01 y 999.999.999 antes de convertirla.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+        if (await db.Orders.AnyAsync(x => x.OpportunityId == id, ct))
+        {
+            TempData["Success"] = "Esta oportunidad ya tiene un pedido asociado.";
+            return RedirectToAction("Details", "Customers", new { id = opportunity.CustomerId });
+        }
+
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            var order = new Order
+            {
+                CustomerId = opportunity.CustomerId,
+                OpportunityId = opportunity.Id,
+                Number = $"PED-OPP-{opportunity.Id}",
+                Description = opportunity.Name,
+                Total = opportunity.EstimatedAmount,
+                Status = OrderStatus.Pending
+            };
+            db.Orders.Add(order);
+            await db.SaveChangesAsync(ct);
+            db.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id, NewStatus = order.Status,
+                ChangedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Source = "Conversión de oportunidad"
+            });
+            OpportunityAutomation.QueuePostSaleTask(db, opportunity);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Orders_OpportunityId" })
+        {
+            TempData["Success"] = "Esta oportunidad ya tiene un pedido asociado.";
+            return RedirectToAction("Details", "Customers", new { id = opportunity.CustomerId });
+        }
+
+        TempData["Success"] = "Oportunidad convertida en pedido. Se creó una tarea de seguimiento posventa.";
+        var recipient = await db.Users.AsNoTracking().Where(x => x.Id == opportunity.AssignedUserId).Select(x => x.Email).FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(recipient) && emailSender.IsConfigured)
+        {
+            try
+            {
+                await emailSender.SendTransactionalAsync(recipient, "Nexo: oportunidad convertida en pedido",
+                    $"La oportunidad «{opportunity.Name}» del cliente {opportunity.Customer.Name} se convirtió en el pedido PED-OPP-{opportunity.Id}.\n\nIngresá a Nexo para ver los detalles.", ct);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "No se pudo enviar el aviso de conversión para la oportunidad {OpportunityId}.", id);
+                TempData["Error"] = "El pedido se creó, pero el correo de aviso no pudo enviarse.";
+            }
+        }
+        return RedirectToAction("Details", "Customers", new { id = opportunity.CustomerId });
     }
 
     public static string StageLabel(OpportunityStage stage) => stage switch

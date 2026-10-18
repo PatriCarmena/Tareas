@@ -9,6 +9,7 @@ public interface IEmailSender
 {
     bool IsConfigured { get; }
     Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken);
+    Task SendTransactionalAsync(string email, string subject, string body, CancellationToken cancellationToken);
 }
 
 public sealed class GmailApiEmailSender(
@@ -28,9 +29,15 @@ public sealed class GmailApiEmailSender(
         && !string.IsNullOrWhiteSpace(FromAddress);
 
     public async Task SendResetCodeAsync(string email, string code, CancellationToken cancellationToken)
+        => await SendTransactionalAsync(email, "Código para recuperar tu contraseña de Nexo",
+            $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje.", cancellationToken);
+
+    public async Task SendTransactionalAsync(string email, string subject, string body, CancellationToken cancellationToken)
     {
         if (!IsConfigured)
             throw new InvalidOperationException("El envío por Gmail todavía no está configurado.");
+        if (email.Contains('\r') || email.Contains('\n') || subject.Contains('\r') || subject.Contains('\n'))
+            throw new ArgumentException("El destinatario o asunto no es válido.");
 
         try
         {
@@ -58,13 +65,12 @@ public sealed class GmailApiEmailSender(
             var message = string.Join("\r\n",
                 $"From: {EncodeHeader(FromName)} <{FromAddress}>",
                 $"To: {email}",
-                $"Subject: {EncodeHeader("Código para recuperar tu contraseña de Nexo")}",
+                $"Subject: {EncodeHeader(subject)}",
                 "MIME-Version: 1.0",
                 "Content-Type: text/plain; charset=UTF-8",
                 "Content-Transfer-Encoding: base64",
                 "",
-                Convert.ToBase64String(Encoding.UTF8.GetBytes(
-                    $"Tu código de recuperación de Nexo es: {code}\n\nVence en 15 minutos. Si no solicitaste este cambio, ignorá este mensaje.")));
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(body)));
 
             using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
@@ -75,20 +81,20 @@ public sealed class GmailApiEmailSender(
 
             var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogError(
-                "Gmail API rechazó el correo de recuperación para {Email}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
+                "Gmail API rechazó un correo transaccional para {Email}. Estado: {StatusCode}. Respuesta: {ResponseBody}",
                 email,
                 (int)response.StatusCode,
                 responseBody);
-            throw new InvalidOperationException("No se pudo enviar el correo de recuperación.");
+            throw new InvalidOperationException("No se pudo enviar el correo transaccional.");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogError("Gmail API no respondió a tiempo al enviar el correo de recuperación para {Email}.", email);
+            logger.LogError("Gmail API no respondió a tiempo al enviar un correo transaccional para {Email}.", email);
             throw new InvalidOperationException("El servicio de correo no respondió a tiempo.");
         }
         catch (HttpRequestException exception)
         {
-            logger.LogError(exception, "No se pudo conectar con Gmail API para enviar el correo de recuperación a {Email}.", email);
+            logger.LogError(exception, "No se pudo conectar con Gmail API para enviar un correo transaccional a {Email}.", email);
             throw new InvalidOperationException("No se pudo conectar con el servicio de correo.", exception);
         }
     }

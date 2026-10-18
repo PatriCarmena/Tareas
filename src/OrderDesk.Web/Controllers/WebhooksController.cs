@@ -20,7 +20,9 @@ public sealed class WebhooksController(AppDbContext db, IConfiguration configura
         var supplied = Request.Headers["X-Webhook-Secret"].ToString();
         if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(supplied)))
             return Unauthorized();
-        if (string.IsNullOrWhiteSpace(message.EventId)) return BadRequest(new { error = "eventId es obligatorio" });
+        if (string.IsNullOrWhiteSpace(message.EventId) || message.EventId.Length > 160)
+            return BadRequest(new { error = "eventId debe tener entre 1 y 160 caracteres" });
+        if (!Enum.IsDefined(message.Status)) return BadRequest(new { error = "Estado inválido" });
         if (await db.WebhookReceipts.AnyAsync(x => x.EventId == message.EventId, ct)) return Ok(new { duplicate = true });
         var order = await db.Orders.FindAsync([message.OrderId], ct);
         if (order is null) return NotFound(new { error = "Pedido inexistente" });

@@ -35,6 +35,11 @@ public sealed class OrdersController(AppDbContext db) : Controller
     [Authorize(Roles = AppRoles.Administrator + "," + AppRoles.Operator)]
     public async Task<IActionResult> Create(Order order, CancellationToken ct)
     {
+        // La vinculación con una oportunidad solo se establece desde la conversión controlada.
+        order.OpportunityId = null;
+        order.Opportunity = null;
+        ModelState.Remove(nameof(Order.OpportunityId));
+        ModelState.Remove(nameof(Order.Opportunity));
         ModelState.Remove(nameof(Order.Customer));
         ModelState.Remove(nameof(Order.WebhookReceipts));
         if (!ModelState.IsValid)

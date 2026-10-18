@@ -11,12 +11,14 @@
         <header class="kanban-column-header"><div><h2>@OpportunitiesController.StageLabel(stage)</h2><span>@cards.Count</span></div><strong>@cards.Sum(x => x.EstimatedAmount).ToString("C0", money)</strong></header>
         <div class="kanban-cards">
         @foreach (var opportunity in cards) {
-            <article class="opportunity-card" data-opportunity-id="@opportunity.Id" draggable="@(canEdit ? "true" : "false")">
+            <article class="opportunity-card" data-opportunity-id="@opportunity.Id" draggable="@(canEdit && opportunity.ConvertedOrder is null ? "true" : "false")">
                 <div class="opportunity-card-top"><strong>@opportunity.Name</strong>@if (canEdit) { <a class="text-link" asp-action="Edit" asp-route-id="@opportunity.Id" aria-label="Editar @opportunity.Name">Editar</a> }</div>
                 <a class="opportunity-customer" asp-controller="Customers" asp-action="Details" asp-route-id="@opportunity.CustomerId">@opportunity.Customer.Name</a>
                 <div class="opportunity-amount">@opportunity.EstimatedAmount.ToString("C0", money)</div>
                 <div class="opportunity-details"><span>@opportunity.Probability% de probabilidad</span><span>Cierre @opportunity.ExpectedCloseDate.ToString("dd/MM/yyyy")</span><span>@(opportunity.AssignedUser?.FullName ?? "Sin asignar")</span></div>
-                @if (canEdit) { <form class="opportunity-stage-form" asp-action="ChangeStage" asp-route-id="@opportunity.Id" method="post"><label class="sr-only" for="stage-@opportunity.Id">Mover @opportunity.Name a</label><select id="stage-@opportunity.Id" name="stage">@foreach (var option in Enum.GetValues<OpportunityStage>()) { <option value="@option" selected="@(option == opportunity.Stage)">@OpportunitiesController.StageLabel(option)</option> }</select><button class="button button-small button-secondary" type="submit">Mover</button></form> }
+                @if (canEdit && opportunity.ConvertedOrder is null) { <form class="opportunity-stage-form" asp-action="ChangeStage" asp-route-id="@opportunity.Id" method="post"><label class="sr-only" for="stage-@opportunity.Id">Mover @opportunity.Name a</label><select id="stage-@opportunity.Id" name="stage">@foreach (var option in Enum.GetValues<OpportunityStage>()) { <option value="@option" selected="@(option == opportunity.Stage)">@OpportunitiesController.StageLabel(option)</option> }</select><button class="button button-small button-secondary" type="submit">Mover</button></form> }
+                @if (opportunity.ConvertedOrder is not null) { <span class="converted-order">Pedido @opportunity.ConvertedOrder.Number creado</span> }
+                else if (canEdit && opportunity.Stage == OpportunityStage.Won) { <form class="convert-form" asp-action="Convert" asp-route-id="@opportunity.Id" method="post" data-confirm-submit="¿Convertir esta oportunidad ganada en un pedido? Se creará también una tarea de seguimiento posventa."><button class="button button-small" type="submit">Convertir en pedido</button></form> }
             </article>
         }
         </div>

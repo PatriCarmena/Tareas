@@ -39,7 +39,24 @@ La conexión y las URL se configuran en `src/OrderDesk.Web/appsettings.json` o m
 
 ## CRM: oportunidades comerciales
 
-Desde la ficha de un cliente, un administrador u operador puede crear una oportunidad con nombre, importe estimado, probabilidad, fecha de cierre, responsable y etapa. El menú **Oportunidades** muestra un tablero Kanban con las etapas Prospecto, Contactado, Propuesta, Negociación, Ganada y Perdida. Se puede buscar por oportunidad o cliente, filtrar por responsable y cambiar la etapa arrastrando una tarjeta o usando su selector **Mover**. Los usuarios de consulta pueden ver el tablero, pero no modificarlo. Una oportunidad ganada no crea automáticamente un pedido: el pedido se registra por separado desde la ficha del cliente.
+Desde la ficha de un cliente, un administrador u operador puede crear una oportunidad con nombre, importe estimado, probabilidad, fecha de cierre, responsable y etapa. El menú **Oportunidades** muestra un tablero Kanban con las etapas Prospecto, Contactado, Propuesta, Negociación, Ganada y Perdida. Se puede buscar por oportunidad o cliente, filtrar por responsable y cambiar la etapa arrastrando una tarjeta o usando su selector **Mover**. Los usuarios de consulta pueden ver el tablero, pero no modificarlo. Una oportunidad ganada puede convertirse en pedido desde el tablero mediante una confirmación explícita.
+
+## Automatización (etapa 4)
+
+- El dashboard destaca las actividades vencidas del usuario y sus próximos seguimientos de los siguientes siete días. Los avisos se calculan al abrir Nexo; el plan gratuito de Render suspende los procesos inactivos, así que no hay un programador de avisos en segundo plano.
+- Al crear o mover una oportunidad a **Propuesta** o **Negociación**, Nexo crea una tarea de seguimiento para el responsable, con vencimiento a los dos días. Evita crear otra tarea idéntica mientras exista una pendiente.
+- Una oportunidad **Ganada** muestra **Convertir en pedido**. La acción crea un pedido pendiente con un número derivado de la oportunidad, registra el origen y crea una tarea posventa. Un índice único evita más de un pedido por oportunidad. Después de convertirla no puede moverse a otra etapa ni cambiar su importe.
+- Si Gmail API está configurada, la conversión envía un correo transaccional al responsable. Una falla de Gmail no deshace el pedido; se muestra un aviso. El envío de códigos de recuperación continúa usando la misma integración.
+- `POST /api/webhooks/opportunities` recibe cambios externos de etapa con `eventId`, `opportunityId` y `stage`. Usa el mismo encabezado secreto `X-Webhook-Secret` que el webhook de pedidos, registra los eventos para evitar duplicados y crea tareas de seguimiento cuando corresponda. Las etapas admitidas son `Prospect`, `Contacted`, `Proposal`, `Negotiation`, `Won` y `Lost`. El webhook **no convierte** automáticamente una oportunidad ganada en pedido; la conversión requiere confirmar la acción dentro de Nexo.
+
+Ejemplo de webhook de oportunidad (con un ID existente y el secreto configurado, sin incluirlo en el repositorio):
+
+```powershell
+$body = '{"eventId":"opp-event-001","opportunityId":1,"stage":"Proposal"}'
+Invoke-RestMethod -Method Post -Uri https://nexo-clientes-pedidos.onrender.com/api/webhooks/opportunities `
+  -Headers @{ "X-Webhook-Secret" = $env:NEXO_WEBHOOK_SECRET } `
+  -ContentType "application/json" -Body $body
+```
 
 ## Webhook de pedidos
 

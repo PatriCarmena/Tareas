@@ -102,7 +102,7 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
             .Where(x => x.CustomerId == id)
             .OrderBy(x => x.Status).ThenBy(x => x.ScheduledAtUtc)
             .ToListAsync(ct);
-        var opportunities = await db.Opportunities.AsNoTracking().Include(x => x.AssignedUser)
+        var opportunities = await db.Opportunities.AsNoTracking().Include(x => x.AssignedUser).Include(x => x.ConvertedOrder)
             .Where(x => x.CustomerId == id).OrderBy(x => x.ExpectedCloseDate).ToListAsync(ct);
         var timeline = customer.Notes.Select(n => new CustomerTimelineItemVm(n.CreatedAtUtc, "note", "Nota interna", n.Content, n.CreatedByUser?.FullName))
             .Concat(customer.Orders.Select(o => new CustomerTimelineItemVm(o.CreatedAtUtc, "order", $"Pedido {o.Number}", $"{o.Description} · {o.Total:C0}")))

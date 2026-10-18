@@ -26,7 +26,11 @@ public sealed class DashboardController(AppDbContext db) : Controller
         var myTasks = await openActivities.Include(x => x.Customer)
             .Where(x => x.AssignedUserId == myId && x.ScheduledAtUtc >= todayStart && x.ScheduledAtUtc < tomorrowStart)
             .OrderBy(x => x.ScheduledAtUtc).Take(10).ToListAsync(ct);
+        var myOverdue = await openActivities.CountAsync(x => x.AssignedUserId == myId && x.ScheduledAtUtc < now, ct);
+        var myUpcoming = await openActivities.Include(x => x.Customer)
+            .Where(x => x.AssignedUserId == myId && x.ScheduledAtUtc >= now && x.ScheduledAtUtc < now.AddDays(7))
+            .OrderBy(x => x.ScheduledAtUtc).Take(5).ToListAsync(ct);
         return View(new DashboardVm(await db.Customers.CountAsync(ct), await active.CountAsync(ct), await active.SumAsync(x => (decimal?)x.Total, ct) ?? 0,
-            grouped, dueToday, overdue, myTasks));
+            grouped, dueToday, overdue, myTasks, myOverdue, myUpcoming));
     }
 }
