@@ -128,7 +128,6 @@ public sealed class CustomersController(AppDbContext db, IExternalCustomerServic
         if (customer is null) return NotFound();
         var now = DateTime.UtcNow;
         db.CustomerNotes.Add(new CustomerNote { CustomerId = id, Content = content.Trim(), CreatedAtUtc = now, CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) });
-        customer.LastContactAtUtc = now;
         await db.SaveChangesAsync(ct);
         TempData["Success"] = "Nota agregada al historial.";
         return RedirectToAction(nameof(Details), new { id });

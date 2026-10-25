@@ -83,6 +83,8 @@ En producción, definir secretos y credenciales fuera del repositorio, habilitar
 
 ## Publicación en Render
 
+El procedimiento de respaldo y restauración de PostgreSQL está en [docs/postgres-backup-restore.md](docs/postgres-backup-restore.md). El plan gratuito no sustituye una copia verificada.
+
 El archivo `render.yaml` describe la aplicación, la API externa y PostgreSQL. Al crear un Blueprint en Render desde este repositorio se aprovisionan los tres recursos, se ejecutan las migraciones al iniciar y se generan automáticamente `Webhook__Secret` y `SeedAdmin__Password`.
 
 Endpoints públicos esperados:

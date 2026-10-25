@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="src/OrderDesk.Web/OrderDesk.Web.csproj" />
   <Project Path="src/OrderDesk.ExternalApi/OrderDesk.ExternalApi.csproj" />
+  <Project Path="tests/OrderDesk.Web.Tests/OrderDesk.Web.Tests.csproj" />
 </Solution>

@@ -85,19 +85,25 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
         var user = await userManager.FindByEmailAsync(model.Email);
         if (user is not null && !string.IsNullOrWhiteSpace(user.Email) && emailSender.IsConfigured)
         {
-            var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-            var entry = new PasswordResetCode { UserId = user.Id, ResetToken = await userManager.GeneratePasswordResetTokenAsync(user), ExpiresAtUtc = DateTime.UtcNow.AddMinutes(15) };
-            entry.CodeHash = new PasswordHasher<PasswordResetCode>().HashPassword(entry, code);
-            try
+            var now = DateTime.UtcNow;
+            var latest = await db.PasswordResetCodes.Where(x => x.UserId == user.Id)
+                .OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+            // Como máximo un envío por minuto para cada cuenta.
+            if (PasswordResetPolicy.CanIssue(latest, now))
             {
-                await emailSender.SendResetCodeAsync(user.Email, code, ct);
-                db.PasswordResetCodes.Add(entry);
-                await db.SaveChangesAsync(ct);
-            }
-            catch (InvalidOperationException)
-            {
-                TempData["Error"] = "No pudimos enviar el código por correo electrónico. Revisá la configuración del servicio de correo e intentá nuevamente.";
-                return RedirectToAction(nameof(ForgotPassword));
+                var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+                var entry = new PasswordResetCode { UserId = user.Id, ExpiresAtUtc = now.AddMinutes(15) };
+                entry.CodeHash = new PasswordHasher<PasswordResetCode>().HashPassword(entry, code);
+                try
+                {
+                    await emailSender.SendResetCodeAsync(user.Email, code, ct);
+                    db.PasswordResetCodes.Add(entry);
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    // La respuesta no revela si la dirección corresponde a una cuenta.
+                }
             }
         }
         TempData["Success"] = "Si la cuenta existe, enviamos un código por correo electrónico válido durante 15 minutos.";
@@ -111,12 +117,24 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
     {
         if (!ModelState.IsValid) return View(model);
         var user = await userManager.FindByEmailAsync(model.Email);
-        var entry = user is null ? null : await db.PasswordResetCodes.Where(x => x.UserId == user.Id && x.UsedAtUtc == null && x.ExpiresAtUtc > DateTime.UtcNow).OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
-        if (entry is null || new PasswordHasher<PasswordResetCode>().VerifyHashedPassword(entry, entry.CodeHash, model.Code) == PasswordVerificationResult.Failed)
+        var now = DateTime.UtcNow;
+        var entry = user is null ? null : await db.PasswordResetCodes.Where(x => x.UserId == user.Id && x.UsedAtUtc == null && x.ExpiresAtUtc > now).OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+        if (!PasswordResetPolicy.CanAttempt(entry, now))
         { ModelState.AddModelError(nameof(model.Code), "El código es inválido o venció."); return View(model); }
-        var result = await userManager.ResetPasswordAsync(user!, entry.ResetToken, model.NewPassword);
+        if (new PasswordHasher<PasswordResetCode>().VerifyHashedPassword(entry!, entry.CodeHash, model.Code) == PasswordVerificationResult.Failed)
+        {
+            PasswordResetPolicy.RecordFailure(entry, now);
+            await db.SaveChangesAsync(ct);
+            ModelState.AddModelError(nameof(model.Code), "El código es inválido o venció.");
+            return View(model);
+        }
+        // El token se genera al confirmar el código, para que un reinicio del servidor
+        // no invalide un código que sigue vigente en PostgreSQL.
+        var token = await userManager.GeneratePasswordResetTokenAsync(user!);
+        var result = await userManager.ResetPasswordAsync(user!, token, model.NewPassword);
         if (!result.Succeeded) { foreach (var error in result.Errors) ModelState.AddModelError(string.Empty, error.Description); return View(model); }
-        entry.UsedAtUtc = DateTime.UtcNow; await db.SaveChangesAsync(ct);
+        await db.PasswordResetCodes.Where(x => x.UserId == user!.Id && x.UsedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.UsedAtUtc, DateTime.UtcNow), ct);
         TempData["Success"] = "Contraseña actualizada. Ya podés iniciar sesión."; return RedirectToAction(nameof(Login));
     }
 

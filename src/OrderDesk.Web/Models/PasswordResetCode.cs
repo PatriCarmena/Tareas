@@ -7,6 +7,7 @@ public sealed class PasswordResetCode
     public AppUser User { get; set; } = null!;
     public string CodeHash { get; set; } = string.Empty;
     public string ResetToken { get; set; } = string.Empty;
+    public int FailedAttempts { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime? UsedAtUtc { get; set; }
 }
