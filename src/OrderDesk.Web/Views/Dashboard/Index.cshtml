@@ -1,16 +1,74 @@
 @model DashboardVm
-@{ ViewData["Title"] = "Dashboard"; }
-<section class="page-heading"><div><p class="eyebrow">RESUMEN</p><h1>Dashboard</h1><p class="subtle">Los pedidos cancelados están excluidos de las métricas comerciales.</p></div></section>
-@if (Model.MyOverdueCount > 0) { <div class="automation-alert" role="status"><strong>Tenés @Model.MyOverdueCount @(Model.MyOverdueCount == 1 ? "actividad vencida" : "actividades vencidas").</strong><span>Revisá tus seguimientos para que no queden pendientes.</span><a asp-controller="Activities" asp-action="Index" asp-route-status="overdue" asp-route-mine="true">Ver mis vencidas →</a></div> }
-<div class="summary-grid"><div class="metric"><span>Clientes</span><strong>@Model.CustomerCount</strong></div><div class="metric"><span>Pedidos activos</span><strong>@Model.OrderCount</strong></div><div class="metric accent"><span>Monto activo</span><strong>@Model.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</strong></div></div>
-<div class="dashboard-grid">@foreach (var row in Model.ByStatus) { <article class="panel"><span class="status status-@row.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(row.Status)</span><strong class="dashboard-number">@row.Count</strong><p>@row.Total.ToString("C0", new System.Globalization.CultureInfo("es-AR"))</p></article> }</div>
-<section class="activity-dashboard" aria-labelledby="activity-reminders-heading">
-    <div class="panel activity-reminders"><div class="panel-title"><div><p class="eyebrow">SEGUIMIENTO</p><h2 id="activity-reminders-heading">Recordatorios</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index">Ver actividades</a></div>
-        <div class="reminder-grid"><a asp-controller="Activities" asp-action="Index" asp-route-status="today"><strong>@Model.DueTodayCount</strong><span>por hacer hoy</span></a><a class="reminder-overdue" asp-controller="Activities" asp-action="Index" asp-route-status="overdue"><strong>@Model.OverdueCount</strong><span>vencidas</span></a></div>
+@using System.Globalization
+@{
+    ViewData["Title"] = "Dashboard";
+    var culture = CultureInfo.GetCultureInfo("es-AR");
+    var today = ActivitySchedule.ToLocal(DateTime.UtcNow);
+    var statusMax = Model.ByStatus.Count == 0 ? 1 : Math.Max(1, Model.ByStatus.Max(x => x.Count));
+}
+
+<section class="dashboard-hero">
+    <div>
+        <p class="eyebrow">@today.ToString("dddd d 'de' MMMM", culture).ToUpper(culture)</p>
+        <h1>Tu espacio de trabajo</h1>
+        <p class="subtle">Clientes, pedidos y seguimientos importantes, todo en un mismo lugar.</p>
     </div>
-    <div class="panel"><div class="panel-title"><div><p class="eyebrow">AGENDA PERSONAL</p><h2>Mis tareas de hoy</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index" asp-route-mine="true">Ver todas</a></div>
-        @if (Model.MyTasksToday.Count == 0) { <p class="subtle">No tenés actividades pendientes asignadas para hoy.</p> }
-        @foreach (var activity in Model.MyTasksToday) { <div class="today-task"><span class="task-time">@ActivitySchedule.ToLocal(activity.ScheduledAtUtc).ToString("HH:mm")</span><div><strong>@activity.Title</strong><small>@ActivitySchedule.TypeLabel(activity.Type) · <a asp-controller="Customers" asp-action="Details" asp-route-id="@activity.CustomerId">@activity.Customer.Name</a></small></div><span class="priority priority-@activity.Priority.ToString().ToLowerInvariant()">@ActivitySchedule.PriorityLabel(activity.Priority)</span></div> }
+    <div class="hero-actions">
+        <a class="button button-secondary" asp-controller="Activities" asp-action="Index">Ver actividades</a>
+        @if (!User.IsInRole(AppRoles.Viewer)) { <a class="button" asp-controller="Customers" asp-action="Create">+ Nuevo cliente</a> }
     </div>
 </section>
-<section class="panel upcoming-panel"><div class="panel-title"><div><p class="eyebrow">PRÓXIMOS 7 DÍAS</p><h2>Mis próximos seguimientos</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index" asp-route-mine="true" asp-route-status="pending">Ver pendientes</a></div>@if (Model.MyUpcoming.Count == 0) { <p class="subtle">No tenés seguimientos próximos.</p> }@foreach (var activity in Model.MyUpcoming) { <div class="today-task"><span class="task-time">@ActivitySchedule.ToLocal(activity.ScheduledAtUtc).ToString("dd/MM HH:mm")</span><div><strong>@activity.Title</strong><small><a asp-controller="Customers" asp-action="Details" asp-route-id="@activity.CustomerId">@activity.Customer.Name</a></small></div></div> }</section>
+
+@if (Model.MyOverdueCount > 0)
+{
+    <div class="automation-alert" role="status"><strong>Tenés @Model.MyOverdueCount @(Model.MyOverdueCount == 1 ? "actividad vencida" : "actividades vencidas").</strong><span>Revisá tus seguimientos para que no queden pendientes.</span><a asp-controller="Activities" asp-action="Index" asp-route-status="overdue" asp-route-mine="true">Ver mis vencidas →</a></div>
+}
+
+<div class="summary-grid dashboard-kpis">
+    <div class="metric"><div class="kpi-top"><span>Clientes</span><span class="kpi-symbol" aria-hidden="true">◌</span></div><strong>@Model.CustomerCount</strong><small class="metric-caption">Registrados en Nexo</small></div>
+    <div class="metric"><div class="kpi-top"><span>Pedidos activos</span><span class="kpi-symbol" aria-hidden="true">◇</span></div><strong>@Model.OrderCount</strong><small class="metric-caption">Sin incluir cancelados</small></div>
+    <div class="metric accent"><div class="kpi-top"><span>Monto activo</span><span class="kpi-symbol" aria-hidden="true">↗</span></div><strong>@Model.Total.ToString("C0", culture)</strong><small class="metric-caption">Total de pedidos no cancelados</small></div>
+</div>
+
+<div class="dashboard-main-grid">
+    <section class="panel dashboard-panel" aria-labelledby="orders-status-heading">
+        <div class="panel-title"><div><p class="eyebrow">PANORAMA COMERCIAL</p><h2 id="orders-status-heading">Pedidos por estado</h2></div><a class="text-link" asp-controller="Orders" asp-action="Index">Ver pedidos →</a></div>
+        @if (Model.ByStatus.Count == 0)
+        {
+            <p class="dashboard-empty">Todavía no hay pedidos activos para mostrar.</p>
+        }
+        else
+        {
+            <div class="status-overview">
+                @foreach (var row in Model.ByStatus)
+                {
+                    var width = (100d * row.Count / statusMax).ToString("0.#", CultureInfo.InvariantCulture);
+                    <div class="status-overview-row"><span class="status status-@row.Status.ToString().ToLowerInvariant()">@OrdersController.StatusLabel(row.Status)</span><div class="status-track" aria-hidden="true"><span class="status-fill status-@row.Status.ToString().ToLowerInvariant()" style="width:@width%"></span></div><span class="status-count" aria-label="@row.Count pedidos">@row.Count</span><span class="status-amount">@row.Total.ToString("C0", culture)</span></div>
+                }
+            </div>
+        }
+    </section>
+    <section class="panel dashboard-panel" aria-labelledby="reminders-heading">
+        <div class="panel-title"><div><p class="eyebrow">SEGUIMIENTO</p><h2 id="reminders-heading">Recordatorios</h2></div></div>
+        <div class="reminder-stack"><a asp-controller="Activities" asp-action="Index" asp-route-status="today"><strong>@Model.DueTodayCount</strong><span>por hacer hoy</span></a><a class="reminder-overdue" asp-controller="Activities" asp-action="Index" asp-route-status="overdue"><strong>@Model.OverdueCount</strong><span>vencidas</span></a></div>
+    </section>
+</div>
+
+<div class="dashboard-agenda-grid">
+    <section class="panel dashboard-panel" aria-labelledby="today-tasks-heading">
+        <div class="panel-title"><div><p class="eyebrow">AGENDA PERSONAL</p><h2 id="today-tasks-heading">Mis tareas de hoy</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index" asp-route-mine="true">Ver todas →</a></div>
+        @if (Model.MyTasksToday.Count == 0) { <p class="subtle">No tenés actividades pendientes asignadas para hoy.</p> }
+        @foreach (var activity in Model.MyTasksToday)
+        {
+            <div class="today-task"><span class="task-time">@ActivitySchedule.ToLocal(activity.ScheduledAtUtc).ToString("HH:mm")</span><div><strong>@activity.Title</strong><small>@ActivitySchedule.TypeLabel(activity.Type) · <a asp-controller="Customers" asp-action="Details" asp-route-id="@activity.CustomerId">@activity.Customer.Name</a></small></div><span class="priority priority-@activity.Priority.ToString().ToLowerInvariant()">@ActivitySchedule.PriorityLabel(activity.Priority)</span></div>
+        }
+    </section>
+    <section class="panel dashboard-panel" aria-labelledby="upcoming-heading">
+        <div class="panel-title"><div><p class="eyebrow">PRÓXIMOS 7 DÍAS</p><h2 id="upcoming-heading">Mis próximos seguimientos</h2></div><a class="text-link" asp-controller="Activities" asp-action="Index" asp-route-mine="true" asp-route-status="pending">Ver pendientes →</a></div>
+        @if (Model.MyUpcoming.Count == 0) { <p class="subtle">No tenés seguimientos próximos.</p> }
+        @foreach (var activity in Model.MyUpcoming)
+        {
+            <div class="today-task"><span class="task-time">@ActivitySchedule.ToLocal(activity.ScheduledAtUtc).ToString("dd/MM HH:mm")</span><div><strong>@activity.Title</strong><small><a asp-controller="Customers" asp-action="Details" asp-route-id="@activity.CustomerId">@activity.Customer.Name</a></small></div></div>
+        }
+    </section>
+</div>
