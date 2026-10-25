@@ -121,7 +121,7 @@ public sealed class AccountController(SignInManager<AppUser> signInManager, User
         var entry = user is null ? null : await db.PasswordResetCodes.Where(x => x.UserId == user.Id && x.UsedAtUtc == null && x.ExpiresAtUtc > now).OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
         if (!PasswordResetPolicy.CanAttempt(entry, now))
         { ModelState.AddModelError(nameof(model.Code), "El código es inválido o venció."); return View(model); }
-        if (new PasswordHasher<PasswordResetCode>().VerifyHashedPassword(entry!, entry.CodeHash, model.Code) == PasswordVerificationResult.Failed)
+        if (new PasswordHasher<PasswordResetCode>().VerifyHashedPassword(entry!, entry!.CodeHash, model.Code) == PasswordVerificationResult.Failed)
         {
             PasswordResetPolicy.RecordFailure(entry, now);
             await db.SaveChangesAsync(ct);
